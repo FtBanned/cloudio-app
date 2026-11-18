@@ -33,6 +33,109 @@ Color shadeTint(Color? c, Color fallback) {
       .toColor();
 }
 
+// ================= Sıralama =================
+enum SongSort { standard, newest, title, artist }
+
+String songSortLabel(SongSort s) => switch (s) {
+      SongSort.standard => 'Varsayılan',
+      SongSort.newest => 'Son eklenen',
+      SongSort.title => 'Ada göre',
+      SongSort.artist => 'Sanatçıya göre',
+    };
+
+int _cmpText(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
+
+/// [src] siyahısının sıralanmış KOPYASINI qaytarır (orijinal dəyişmir).
+List<Song> sortedSongs(List<Song> src, SongSort sort) {
+  final l = List<Song>.of(src);
+  switch (sort) {
+    case SongSort.standard:
+      break; // olduğu kimi
+    case SongSort.newest:
+      l.sort((a, b) => b.seq.compareTo(a.seq));
+    case SongSort.title:
+      l.sort((a, b) => _cmpText(a.title, b.title));
+    case SongSort.artist:
+      l.sort((a, b) {
+        final r = _cmpText(a.artist, b.artist);
+        return r != 0 ? r : _cmpText(a.title, b.title);
+      });
+  }
+  return l;
+}
+
+/// Aşağıdan açılan "Sırala" menyusu. Seçilən variantın indeksini qaytarır (ləğv: null).
+Future<int?> showSortSheet(BuildContext context,
+    {required List<String> options, required int selected}) {
+  return showModalBottomSheet<int>(
+    context: context,
+    backgroundColor: kCard,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Sırala',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          for (var i = 0; i < options.length; i++)
+            ListTile(
+              title: Text(options[i],
+                  style: TextStyle(
+                      color: i == selected ? kGreen : null,
+                      fontWeight:
+                          i == selected ? FontWeight.bold : FontWeight.normal)),
+              trailing:
+                  i == selected ? const Icon(Icons.check, color: kGreen) : null,
+              onTap: () => Navigator.pop(ctx, i),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
+
+/// "⇅ Varsayılan" şəklində kiçik sıralama çubuğu.
+class SortBar extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const SortBar({super.key, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 16, 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.swap_vert, size: 20),
+                const SizedBox(width: 6),
+                Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class CloudioApp extends StatelessWidget {
   const CloudioApp({super.key});
 
@@ -245,21 +348,28 @@ class ProfileAvatar extends StatelessWidget {
 class FilterPill extends StatelessWidget {
   final String label;
   final bool selected;
-  const FilterPill(this.label, {super.key, this.selected = false});
+  final VoidCallback? onTap;
+  const FilterPill(this.label,
+      {super.key, this.selected = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? kGreen : kCard,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? Colors.black : Colors.white,
-          fontWeight: FontWeight.w600,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? kGreen : kCard,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.black : Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -550,13 +660,16 @@ class NowPlayingPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton(
-                        tooltip: 'Sıra',
-                        icon: const Icon(Icons.queue_music),
-                        onPressed: () => openQueue(context),
-                      ),
+                    Row(
+                      children: [
+                        const _SleepTimerButton(),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Sıra',
+                          icon: const Icon(Icons.queue_music),
+                          onPressed: () => openQueue(context),
+                        ),
+                      ],
                     ),
                   ],
                             ),
@@ -578,6 +691,103 @@ class NowPlayingPage extends StatelessWidget {
       },
     );
   }
+}
+
+/// Tam ekran pleyerdə yuxu taymeri düyməsi: aktivdirsə yaşıl olur və qalan vaxtı göstərir.
+class _SleepTimerButton extends StatelessWidget {
+  const _SleepTimerButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        if (!c.sleepActive) {
+          return IconButton(
+            tooltip: 'Uyku zamanlayıcısı',
+            icon: const Icon(Icons.bedtime_outlined),
+            onPressed: () => showSleepSheet(context),
+          );
+        }
+        Widget btn(String text) => TextButton.icon(
+              onPressed: () => showSleepSheet(context),
+              icon: const Icon(Icons.bedtime, color: kGreen),
+              label: Text(text,
+                  style: const TextStyle(
+                      color: kGreen, fontWeight: FontWeight.bold)),
+            );
+        final ends = c.sleepEndsAt;
+        if (ends == null) return btn('Şarkı bitince');
+        // Qalan vaxt hər saniyə yenilənir
+        return StreamBuilder<int>(
+          stream: Stream.periodic(const Duration(seconds: 1), (i) => i),
+          builder: (context, _) =>
+              btn(formatDuration(ends.difference(DateTime.now()))),
+        );
+      },
+    );
+  }
+}
+
+/// Yuxu taymeri variantları.
+void showSleepSheet(BuildContext context) {
+  final c = PlayerController.instance;
+  const options = <(String, int)>[
+    ('5 dakika', 5),
+    ('10 dakika', 10),
+    ('15 dakika', 15),
+    ('30 dakika', 30),
+    ('45 dakika', 45),
+    ('1 saat', 60),
+  ];
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Uyku zamanlayıcısı',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            for (final o in options)
+              ListTile(
+                title: Text(o.$1),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  c.setSleepTimer(Duration(minutes: o.$2));
+                },
+              ),
+            ListTile(
+              title: const Text('Şarkı bitince'),
+              onTap: () {
+                Navigator.pop(ctx);
+                c.sleepAfterCurrentSong();
+              },
+            ),
+            if (c.sleepActive)
+              ListTile(
+                leading: const Icon(Icons.close, color: kGreen),
+                title: const Text('Zamanlayıcıyı kapat',
+                    style: TextStyle(color: kGreen)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  c.cancelSleepTimer();
+                },
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// Tam ekran oynatıcıda cover-in altındakı cari söz sətri: mahnı getdikcə yuxarı sürüşərək dəyişir.
@@ -717,8 +927,16 @@ class SeekBar extends StatelessWidget {
 }
 
 // ================= Ana Sayfa =================
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  // false = "Tümü" (ilk 6 şarkı), true = "Müzik" (bütün şarkılar)
+  bool _musicOnly = false;
 
   @override
   Widget build(BuildContext context) {
@@ -726,41 +944,61 @@ class HomePage extends StatelessWidget {
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) {
-        final count = c.songs.length < 6 ? c.songs.length : 6;
-        return ListView(
-          padding: EdgeInsets.only(
-              bottom: 16 + MediaQuery.of(context).padding.bottom),
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  ProfileAvatar(),
-                  SizedBox(width: 12),
-                  FilterPill('Tümü', selected: true),
-                  SizedBox(width: 8),
-                  FilterPill('Müzik'),
-                ],
-              ),
+        final songs = c.songs;
+        final count = _musicOnly
+            ? songs.length
+            : (songs.length < 6 ? songs.length : 6);
+
+        // Başlıq hissəsi; mahnılar ListView.builder ilə tənbəl (lazy) qurulur
+        final header = <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                const ProfileAvatar(),
+                const SizedBox(width: 12),
+                FilterPill(
+                  'Tümü',
+                  selected: !_musicOnly,
+                  onTap: () => setState(() => _musicOnly = false),
+                ),
+                const SizedBox(width: 8),
+                FilterPill(
+                  'Müzik',
+                  selected: _musicOnly,
+                  onTap: () => setState(() => _musicOnly = true),
+                ),
+              ],
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(_musicOnly ? 'Tüm şarkılar' : 'Dinlemeye başla',
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          ),
+          if (songs.isEmpty)
             const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Dinlemeye başla',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            ),
-            if (c.songs.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(
-                  child: Text(
-                    'Henüz şarkı yok.\nKitaplığın sekmesinden şarkı ekle.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white60),
-                  ),
+              padding: EdgeInsets.all(32),
+              child: Center(
+                child: Text(
+                  'Henüz şarkı yok.\nKitaplığın sekmesinden şarkı ekle.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white60),
                 ),
               ),
-            for (var i = 0; i < count; i++) SongTile(song: c.songs[i]),
-          ],
+            ),
+        ];
+
+        return ListView.builder(
+          padding: EdgeInsets.only(
+              bottom: 16 + MediaQuery.of(context).padding.bottom),
+          itemCount: header.length + count,
+          itemBuilder: (context, i) {
+            if (i < header.length) return header[i];
+            final s = songs[i - header.length];
+            return SongTile(key: ValueKey(s.id), song: s);
+          },
         );
       },
     );
@@ -892,8 +1130,27 @@ class CategoryTile extends StatelessWidget {
 }
 
 // ================= Kitaplığın =================
-class LibraryPage extends StatelessWidget {
+class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
+
+  @override
+  State<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends State<LibraryPage> {
+  // Çalma listelərinin sıralanması: 0 = yaradılma sırası, 1 = son yaradılan, 2 = ada görə
+  static const _sortLabels = ['Oluşturma sırası', 'Son oluşturulan', 'Ada göre'];
+  int _sort = 0;
+
+  List<Playlist> _sortedPlaylists(List<Playlist> src) {
+    final l = List<Playlist>.of(src);
+    if (_sort == 1) {
+      return l.reversed.toList();
+    } else if (_sort == 2) {
+      l.sort((a, b) => _cmpText(a.name, b.name));
+    }
+    return l;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -981,7 +1238,38 @@ class LibraryPage extends StatelessWidget {
                 builder: (_) => const CollectionPage.all(),
               )),
             ),
-            for (final p in c.playlists)
+            if (c.songs.isNotEmpty)
+              _CollectionRow(
+                leading: const _IconSquare(
+                    Icons.person, [Color(0xFF8E24AA), Color(0xFFE91E8C)]),
+                title: 'Sanatçılar',
+                subtitle:
+                    'Kitaplık • ${groupSongs(c.songs, byAlbum: false).length} sanatçı',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const GroupListPage(byAlbum: false),
+                )),
+              ),
+            if (c.songs.any((s) => s.album.trim().isNotEmpty))
+              _CollectionRow(
+                leading: const _IconSquare(
+                    Icons.album, [Color(0xFF00695C), Color(0xFF26A69A)]),
+                title: 'Albümler',
+                subtitle:
+                    'Kitaplık • ${groupSongs(c.songs, byAlbum: true).length} albüm',
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const GroupListPage(byAlbum: true),
+                )),
+              ),
+            if (c.playlists.length > 1)
+              SortBar(
+                label: _sortLabels[_sort],
+                onTap: () async {
+                  final i = await showSortSheet(context,
+                      options: _sortLabels, selected: _sort);
+                  if (i != null && mounted) setState(() => _sort = i);
+                },
+              ),
+            for (final p in _sortedPlaylists(c.playlists))
               _CollectionRow(
                 leading: MosaicCover(songs: p.songs, size: 56),
                 title: p.name,
@@ -1114,24 +1402,77 @@ void openPlaylist(BuildContext context, Playlist p) {
   ));
 }
 
-enum _CollectionKind { all, liked, playlist }
+enum _CollectionKind { all, liked, playlist, artist, album }
 
-class CollectionPage extends StatelessWidget {
+// ---- Sənətçi / albom qrupları ----
+class SongGroup {
+  final String name;
+  final List<Song> songs = [];
+  SongGroup(this.name);
+
+  /// Qrupun ilk tapılan üzlüyü (varsa)
+  Uint8List? get cover {
+    for (final s in songs) {
+      if (s.cover != null) return s.cover;
+    }
+    return null;
+  }
+}
+
+String _groupName(Song s, bool byAlbum) =>
+    (byAlbum ? s.album : s.artist).trim();
+
+/// Mahnıları sənətçiyə (və ya albomə) görə qruplaşdırır; adlar böyük/kiçik hərfə həssas deyil.
+/// Albomu boş olan mahnılar albom siyahısına düşmür.
+List<SongGroup> groupSongs(List<Song> src, {required bool byAlbum}) {
+  final map = <String, SongGroup>{};
+  for (final s in src) {
+    final name = _groupName(s, byAlbum);
+    if (name.isEmpty) continue;
+    map.putIfAbsent(name.toLowerCase(), () => SongGroup(name)).songs.add(s);
+  }
+  final l = map.values.toList()..sort((a, b) => _cmpText(a.name, b.name));
+  return l;
+}
+
+class CollectionPage extends StatefulWidget {
   final _CollectionKind kind;
   final Playlist? playlistRef;
+  final String? groupName; // sənətçi / albom adı
 
   const CollectionPage.all({super.key})
       : kind = _CollectionKind.all,
-        playlistRef = null;
+        playlistRef = null,
+        groupName = null;
   const CollectionPage.liked({super.key})
       : kind = _CollectionKind.liked,
-        playlistRef = null;
+        playlistRef = null,
+        groupName = null;
   const CollectionPage.playlist(Playlist p, {super.key})
       : kind = _CollectionKind.playlist,
-        playlistRef = p;
+        playlistRef = p,
+        groupName = null;
+  const CollectionPage.artist(String name, {super.key})
+      : kind = _CollectionKind.artist,
+        playlistRef = null,
+        groupName = name;
+  const CollectionPage.album(String name, {super.key})
+      : kind = _CollectionKind.album,
+        playlistRef = null,
+        groupName = name;
+
+  @override
+  State<CollectionPage> createState() => _CollectionPageState();
+}
+
+class _CollectionPageState extends State<CollectionPage> {
+  SongSort _sort = SongSort.standard;
+  bool _editing = false; // çalma siyahısında "Düzenle" rejimi (sürüklə-burax)
 
   @override
   Widget build(BuildContext context) {
+    final kind = widget.kind;
+    final playlistRef = widget.playlistRef;
     final c = PlayerController.instance;
     return ListenableBuilder(
       listenable: c,
@@ -1145,22 +1486,46 @@ class CollectionPage extends StatelessWidget {
           return const Scaffold();
         }
 
-        final List<Song> list;
-        final String title;
-        switch (kind) {
-          case _CollectionKind.all:
-            list = c.songs;
-            title = 'Tüm Şarkılar';
-          case _CollectionKind.liked:
-            list = c.likedSongs;
-            title = 'Beğenilen Şarkılar';
-          case _CollectionKind.playlist:
-            list = pl!.songs;
-            title = pl.name;
+        // Sənətçi/albom: mahnılar silinib qrup boşalıbsa səhifəni bağla
+        final gName = widget.groupName;
+        List<Song> groupSongsNow = const [];
+        if (gName != null) {
+          final byAlbum = kind == _CollectionKind.album;
+          final key = gName.trim().toLowerCase();
+          groupSongsNow = [
+            for (final s in c.songs)
+              if (_groupName(s, byAlbum).toLowerCase() == key) s,
+          ];
+          if (groupSongsNow.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) Navigator.of(context).maybePop();
+            });
+            return const Scaffold();
+          }
         }
 
+        final List<Song> base; // sıralanmamış orijinal siyahı
+        final String title;
+        switch (kind) {
+          case _CollectionKind.artist:
+          case _CollectionKind.album:
+            base = groupSongsNow;
+            title = gName!;
+          case _CollectionKind.all:
+            base = c.songs;
+            title = 'Tüm Şarkılar';
+          case _CollectionKind.liked:
+            base = c.likedSongs;
+            title = 'Beğenilen Şarkılar';
+          case _CollectionKind.playlist:
+            base = pl!.songs;
+            title = pl.name;
+        }
+        // Ekranda göstərilən və çalınan siyahı (seçilmiş sıralama ilə)
+        final list = sortedSongs(base, _sort);
+
         Color? tint;
-        for (final s in list) {
+        for (final s in base) {
           if (s.tint != null) {
             tint = s.tint;
             break;
@@ -1184,7 +1549,7 @@ class CollectionPage extends StatelessWidget {
                           Icons.favorite,
                           [Color(0xFF4A2BD8), Color(0xFF9DB6E8)],
                           size: 200),
-                      _ => MosaicCover(songs: list, size: 200),
+                      _ => MosaicCover(songs: base, size: 200),
                     },
                   ),
                   Padding(
@@ -1202,7 +1567,8 @@ class CollectionPage extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                     child: Row(
                       children: [
-                        if (kind != _CollectionKind.liked)
+                        if (kind == _CollectionKind.all ||
+                            kind == _CollectionKind.playlist)
                           _ActionPill(
                             icon: Icons.add,
                             label: 'Ekle',
@@ -1257,6 +1623,49 @@ class CollectionPage extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (base.length > 1 ||
+                      (kind == _CollectionKind.playlist &&
+                          (base.isNotEmpty || _editing)))
+                    Row(
+                      children: [
+                        Expanded(
+                          child: (_editing || base.length < 2)
+                              ? const SizedBox.shrink()
+                              : SortBar(
+                                  label: songSortLabel(_sort),
+                                  onTap: () async {
+                                    final i = await showSortSheet(context,
+                                        options: [
+                                          for (final s in SongSort.values)
+                                            songSortLabel(s)
+                                        ],
+                                        selected: _sort.index);
+                                    if (i != null && mounted) {
+                                      setState(() => _sort = SongSort.values[i]);
+                                    }
+                                  },
+                                ),
+                        ),
+                        if (kind == _CollectionKind.playlist)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: TextButton(
+                              onPressed: () => setState(() {
+                                _editing = !_editing;
+                                // Düzenləmə həqiqi sıra üzərində aparılır
+                                if (_editing) _sort = SongSort.standard;
+                              }),
+                              child: Text(
+                                _editing ? 'Bitti' : 'Düzenle',
+                                style: TextStyle(
+                                  color: _editing ? kGreen : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   if (list.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(32),
@@ -1269,6 +1678,9 @@ class CollectionPage extends StatelessWidget {
                               'Henüz şarkı yok.\n"Ekle" ile dosya seç.',
                             _CollectionKind.playlist =>
                               'Bu liste boş.\n"Ekle" ile kitaplığından şarkı seç.',
+                            _CollectionKind.artist ||
+                            _CollectionKind.album =>
+                              'Bu bölümde şarkı yok.',
                           },
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.white60),
@@ -1290,16 +1702,182 @@ class CollectionPage extends StatelessWidget {
               ),
             ),
             child: SafeArea(
-              child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 16),
-                itemCount: header.length + list.length,
-                itemBuilder: (context, i) {
-                  if (i < header.length) return header[i];
-                  final s = list[i - header.length];
-                  return SongTile(
-                      key: ValueKey(s.id), song: s, queue: list, playlist: pl);
-                },
+              child: (_editing && pl != null)
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverList(delegate: SliverChildListDelegate(header)),
+                        SliverReorderableList(
+                          itemCount: pl.songs.length,
+                          onReorderItem: (oldI, newI) =>
+                              c.reorderPlaylist(pl, oldI, newI),
+                          proxyDecorator: (child, index, animation) => Material(
+                            color: kCard,
+                            elevation: 6,
+                            borderRadius: BorderRadius.circular(8),
+                            child: child,
+                          ),
+                          itemBuilder: (context, i) {
+                            final s = pl.songs[i];
+                            return _EditSongRow(
+                              key: ValueKey(s.id),
+                              song: s,
+                              index: i,
+                              onRemove: () => c.removeFromPlaylist(pl, s),
+                            );
+                          },
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                      ],
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      itemCount: header.length + list.length,
+                      itemBuilder: (context, i) {
+                        if (i < header.length) return header[i];
+                        final s = list[i - header.length];
+                        return SongTile(
+                            key: ValueKey(s.id),
+                            song: s,
+                            queue: list,
+                            playlist: pl);
+                      },
+                    ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// "Düzenle" rejimində bir sətir: sağda çıxar (−) düyməsi və sürükləmə tutacağı (≡).
+class _EditSongRow extends StatelessWidget {
+  final Song song;
+  final int index;
+  final VoidCallback onRemove;
+  const _EditSongRow({
+    super.key,
+    required this.song,
+    required this.index,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Cover(size: 48, bytes: song.cover),
+        title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(song.artist,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white60)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Bu listeden çıkar',
+              icon: const Icon(Icons.remove_circle_outline),
+              onPressed: onRemove,
+            ),
+            ReorderableDragStartListener(
+              index: index,
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.drag_handle),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bütün sənətçilərin (byAlbum: false) və ya albomların (byAlbum: true) siyahısı.
+class GroupListPage extends StatelessWidget {
+  final bool byAlbum;
+  const GroupListPage({super.key, required this.byAlbum});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final groups = groupSongs(c.songs, byAlbum: byAlbum);
+        return Scaffold(
+          bottomNavigationBar: const MiniPlayer(),
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    Text(byAlbum ? 'Albümler' : 'Sanatçılar',
+                        style: const TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Expanded(
+                  child: groups.isEmpty
+                      ? const Center(
+                          child: Text('Henüz kayıt yok',
+                              style: TextStyle(color: Colors.white60)),
+                        )
+                      : ListView.builder(
+                          itemCount: groups.length,
+                          itemBuilder: (context, i) {
+                            final g = groups[i];
+                            final art = g.cover;
+                            return ListTile(
+                              key: ValueKey(g.name.toLowerCase()),
+                              leading: byAlbum
+                                  ? Cover(size: 56, bytes: art)
+                                  : ClipOval(
+                                      child: SizedBox(
+                                        width: 56,
+                                        height: 56,
+                                        child: art == null
+                                            ? Container(
+                                                color: Colors.grey.shade800,
+                                                child: const Icon(Icons.person),
+                                              )
+                                            : Image.memory(art,
+                                                fit: BoxFit.cover,
+                                                cacheWidth: 168,
+                                                gaplessPlayback: true),
+                                      ),
+                                    ),
+                              title: Text(g.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                              subtitle: Text(
+                                  byAlbum
+                                      ? '${g.songs.first.artist} • ${g.songs.length} şarkı'
+                                      : '${g.songs.length} şarkı',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white60, fontSize: 13)),
+                              onTap: () => Navigator.of(context)
+                                  .push(MaterialPageRoute(
+                                builder: (_) => byAlbum
+                                    ? CollectionPage.album(g.name)
+                                    : CollectionPage.artist(g.name),
+                              )),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
           ),
         );

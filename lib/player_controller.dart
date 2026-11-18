@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show Color;
@@ -10,6 +10,7 @@ import 'package:just_audio/just_audio.dart';
 import 'audio_url_stub.dart' if (dart.library.js_interop) 'audio_url_web.dart';
 import 'cover_lookup.dart';
 import 'cover_tint.dart';
+import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
 import 'lyrics.dart';
 import 'persistence.dart';
 import 'tag_reader.dart';
@@ -37,7 +38,8 @@ class Song {
   Uint8List? cover; // gömülü ya da internetten bulunan kapak (jpeg/png baytları)
   Color? tint; // kapağın ortalama rengi
   CoverStatus coverStatus;
-  final String? path; // telefon/masaüstünde dosya yolu
+  final String? path; // telefon/masaüstünde fayl yolu (hər açılışda yenidən tapılır)
+  final String? file; // telefonda tətbiq qovluğundakı fayl adı (bazada saxlanır)
   Uint8List? bytes; // web'de dosya içeriği (bazadan lazım olanda yüklənir, sonra boşaldılır)
   final String ext;
   bool liked = false; // beğenilenler (yeşil tik)
@@ -53,6 +55,7 @@ class Song {
     this.cover,
     this.tint,
     this.path,
+    this.file,
     this.bytes,
     required this.ext,
     this.lyrics,
@@ -102,6 +105,7 @@ class PlayerController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     try {
+      await initLocalFiles();
       await CloudioStore.instance.open();
       final lib = await CloudioStore.instance.loadAll();
       if (lib != null) {
@@ -119,6 +123,8 @@ class PlayerController extends ChangeNotifier {
             tint: tint,
             ext: r.ext,
             lyrics: r.lyrics,
+            file: r.file,
+            path: audioPathFor(r.file),
           );
           s.liked = r.liked;
           if (cover == null && r.coverStatus == CoverStatus.none.index) {
@@ -163,6 +169,7 @@ class PlayerController extends ChangeNotifier {
       cover: s.cover,
       lyrics: s.lyrics,
       lyricsNotFound: s.lyricsStatus == LyricsStatus.notFound,
+      file: s.file,
       audio: withAudio ? s.bytes : null,
     );
   }
@@ -372,6 +379,20 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Çalma siyahısında mahnının yerini dəyişir. [newIndex] artıq düzəldilmiş
+  /// indeksdir (Flutter-in onReorderItem-i belə verir), əlavə -1 lazım deyil.
+  /// Hazırda çalan növbəyə (queue) toxunmur.
+  void reorderPlaylist(Playlist p, int oldIndex, int newIndex) {
+    final n = p.songs.length;
+    if (oldIndex < 0 || oldIndex >= n || n < 2) return;
+    final target = newIndex.clamp(0, n - 1);
+    if (target == oldIndex) return;
+    final s = p.songs.removeAt(oldIndex);
+    p.songs.insert(target, s);
+    _savePlaylists();
+    notifyListeners();
+  }
+
   void removeFromPlaylist(Playlist p, Song s) {
     p.songs.remove(s);
     _savePlaylists();
@@ -387,6 +408,7 @@ class PlayerController extends ChangeNotifier {
     songs.remove(s);
     _queue.remove(s);
     unawaited(CloudioStore.instance.deleteSong(s.id));
+    unawaited(deleteAudioFile(s.file));
     _savePlaylists();
     if (cur == s) {
       currentIndex = null;
@@ -427,13 +449,23 @@ class PlayerController extends ChangeNotifier {
           nameTitle = fileTitle.substring(dash + 3).trim();
         }
 
+        final seq = ++_seq;
+        // Telefonda: müvəqqəti faylı tətbiqin qovluğuna köçür ki, tətbiq bağlanıb açılanda qalsın
+        String? localFile;
+        String? localPath = kIsWeb ? null : f.path;
+        if (!kIsWeb && f.path != null) {
+          localFile = await importAudioFile(
+              sourcePath: f.path!, fileName: '$seq.$ext');
+          if (localFile != null) localPath = audioPathFor(localFile);
+        }
+
         final tags = readTags(bytes, ext);
         final cover = tags.cover;
         final tint = cover == null ? null : await coverTint(cover);
 
         final song = Song(
           id: id,
-          seq: ++_seq,
+          seq: seq,
           title: tags.title.isNotEmpty ? tags.title : nameTitle,
           artist: tags.artist.isNotEmpty
               ? tags.artist
@@ -445,7 +477,8 @@ class PlayerController extends ChangeNotifier {
           cover: cover,
           tint: tint,
           ext: ext,
-          path: kIsWeb ? null : f.path,
+          path: localPath,
+          file: localFile,
           bytes: kIsWeb ? bytes : null,
         );
         songs.add(song);
@@ -508,7 +541,12 @@ class PlayerController extends ChangeNotifier {
         await player.setUrl(url);
         if (oldUrl != null) revokeAudioUrl(oldUrl);
       } else {
-        await player.setFilePath(s.path!);
+        final path = s.path;
+        if (path == null) {
+          debugPrint('Fayl tapılmadı: ${s.title}');
+          return;
+        }
+        await player.setFilePath(path);
       }
       player.play();
     } catch (e, st) {
@@ -559,12 +597,12 @@ class PlayerController extends ChangeNotifier {
   // ---- Sıra (queue) ekranı ----
   String queueName = 'Tüm Şarkılar'; // "Çalan: ..." yazısı
 
+  /// Sıradan asılı olmayaraq: eyni mahnılar varsa eyni siyahı sayılır
+  /// (sıralanmış siyahıdan çalanda da ad düzgün çıxsın deyə).
   bool _sameList(List<Song> a, List<Song> b) {
     if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (!identical(a[i], b[i])) return false;
-    }
-    return true;
+    final set = Set<Song>.identity()..addAll(b);
+    return a.every(set.contains);
   }
 
   /// Hansı siyahıdan çalındığını siyahının məzmunundan tapır.
@@ -573,6 +611,13 @@ class PlayerController extends ChangeNotifier {
     if (_sameList(ctx, likedSongs)) return 'Beğenilen Şarkılar';
     for (final p in playlists) {
       if (_sameList(ctx, p.songs)) return p.name;
+    }
+    // Albom / sənətçi səhifəsindən çalınıbsa onun adı
+    if (ctx.isNotEmpty) {
+      final al = ctx.first.album.trim();
+      if (al.isNotEmpty && ctx.every((s) => s.album.trim() == al)) return al;
+      final ar = ctx.first.artist.trim();
+      if (ar.isNotEmpty && ctx.every((s) => s.artist.trim() == ar)) return ar;
     }
     return 'Arama sonuçları';
   }
@@ -703,7 +748,75 @@ class PlayerController extends ChangeNotifier {
     await _playIndex(_order[0]);
   }
 
+  // ---- yuxu taymeri ----
+  Timer? _sleepTimer;
+  Timer? _fadeTimer;
+  DateTime? sleepEndsAt; // dəqiqələrlə taymer bitəcək an (yoxdursa null)
+  bool sleepAtSongEnd = false; // "mahnı bitəndə dayan"
+
+  bool get sleepActive => sleepEndsAt != null || sleepAtSongEnd;
+
+  void _clearSleep() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    sleepEndsAt = null;
+    sleepAtSongEnd = false;
+    // səssizləşmə yarımçıq qalıbsa səsi bərpa et
+    if (_fadeTimer != null) {
+      _fadeTimer!.cancel();
+      _fadeTimer = null;
+      unawaited(player.setVolume(1.0));
+    }
+  }
+
+  void setSleepTimer(Duration d) {
+    _clearSleep();
+    sleepEndsAt = DateTime.now().add(d);
+    _sleepTimer = Timer(d, _sleepFire);
+    notifyListeners();
+  }
+
+  void sleepAfterCurrentSong() {
+    _clearSleep();
+    sleepAtSongEnd = true;
+    notifyListeners();
+  }
+
+  void cancelSleepTimer() {
+    _clearSleep();
+    notifyListeners();
+  }
+
+  /// Vaxt bitdi: səs ~3 saniyəyə azalır, sonra mahnı dayanır, səs 100%-ə qaytarılır.
+  void _sleepFire() {
+    _sleepTimer = null;
+    sleepEndsAt = null;
+    notifyListeners();
+    if (!player.playing) return;
+    const steps = 20; // 20 x 150 ms = 3 saniyə
+    var step = 0;
+    _fadeTimer?.cancel();
+    _fadeTimer = Timer.periodic(const Duration(milliseconds: 150), (t) async {
+      step++;
+      if (step >= steps) {
+        t.cancel();
+        _fadeTimer = null;
+        await player.pause();
+        await player.setVolume(1.0);
+      } else {
+        await player.setVolume(1.0 - step / steps);
+      }
+    });
+  }
+
   Future<void> _onCompleted() async {
+    if (sleepAtSongEnd) {
+      sleepAtSongEnd = false;
+      await player.pause();
+      await player.seek(Duration.zero);
+      notifyListeners();
+      return;
+    }
     if (repeatKind == RepeatKind.one) {
       await player.seek(Duration.zero);
       player.play();

@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:sembast/sembast.dart';
 
-import 'cloudio_db_stub.dart' if (dart.library.js_interop) 'cloudio_db_web.dart';
+import 'cloudio_db_stub.dart'
+    if (dart.library.js_interop) 'cloudio_db_web.dart'
+    if (dart.library.io) 'cloudio_db_io.dart';
 import 'lyrics.dart';
 
 /// Diskdən oxunmuş bir mahnı (Song obyekti player_controller.dart-da qurulur).
@@ -20,6 +22,7 @@ class SavedSong {
   final Uint8List? cover;
   final Lyrics? lyrics;
   final bool lyricsNotFound;
+  final String? file; // telefonda: tətbiq qovluğundakı səs faylının adı
 
   SavedSong({
     required this.id,
@@ -33,6 +36,7 @@ class SavedSong {
     required this.cover,
     required this.lyrics,
     required this.lyricsNotFound,
+    this.file,
   });
 }
 
@@ -129,6 +133,7 @@ class CloudioStore {
             cover: coverB64 == null ? null : base64Decode(coverB64),
             lyrics: _lyricsFromMap(m['lyrics']),
             lyricsNotFound: m['lyricsNotFound'] as bool? ?? false,
+            file: m['file'] as String?,
           ));
         } catch (e) {
           debugPrint('[Cloudio DB] bir mahnı oxunmadı (${snap.key}): $e');
@@ -185,6 +190,7 @@ class CloudioStore {
     Uint8List? cover,
     Lyrics? lyrics,
     required bool lyricsNotFound,
+    String? file,
     Uint8List? audio,
   }) async {
     final db = _db;
@@ -201,6 +207,7 @@ class CloudioStore {
         'cover': cover == null ? null : base64Encode(cover),
         'lyrics': lyrics == null ? null : _lyricsToMap(lyrics),
         'lyricsNotFound': lyricsNotFound,
+        'file': file,
       };
       await db.transaction((txn) async {
         await _songs.record(id).put(txn, meta);
