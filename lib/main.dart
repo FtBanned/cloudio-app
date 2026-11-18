@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:audio_service/audio_service.dart' show AudioService, AudioServiceConfig;
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
@@ -19,6 +20,9 @@ Future<void> main() async {
   // Xəta olsa tətbiq yenə də açılır, sadəcə kilid ekranı idarəsi olmur.
   if (!kIsWeb) {
     try {
+      // iOS: ses oturumu "playback" olmalı, yoksa uygulama arka plana geçince müzik susar
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
       await AudioService.init(
         builder: () => CloudioAudioHandler(PlayerController.instance),
         config: AudioServiceConfig(

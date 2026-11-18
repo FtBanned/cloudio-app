@@ -10,6 +10,14 @@ workflows:
     scripts:
       - name: Paketleri yukle
         script: flutter pub get
+      - name: Info.plist arka plan ses izni
+        script: |
+          PL=ios/Runner/Info.plist
+          if ! /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" >/dev/null 2>&1; then
+            /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PL"
+            /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PL"
+          fi
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL"
       - name: iOS build (imzasiz)
         script: flutter build ios --release --no-codesign
       - name: IPA yarat

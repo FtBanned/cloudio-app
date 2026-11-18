@@ -17,7 +17,8 @@ import 'tag_reader.dart';
 
 /// false yapılırsa söz araması asla internete çıkmaz (sadece dosyadaki/.lrc sözler).
 /// İnternete sadece şarkı adı, sanatçı ve albüm metni gider (lrclib.net).
-const kOnlineLyrics = true;
+/// Web'de CORS yüzünden her aramada istisna fırlıyor; sadece telefonda açık.
+const kOnlineLyrics = !kIsWeb;
 
 const kUnknownArtist = 'Bilinmeyen sanatçı';
 

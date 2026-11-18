@@ -12,7 +12,9 @@ import 'lyrics.dart' show cleanForSearch;
 /// Siteler arası limitlere uyulur (iTunes ≈ 20 sorgu/dk, MusicBrainz 1/sn).
 ///
 /// Gizlilik: aramaya sadece şarkı adı ve sanatçı metni gider.
-const kOnlineCovers = true;
+/// Web'de tarayıcı (CORS) bu siteleri engelliyor; her denemede istisna fırlayıp
+/// hata ayıklayıcıyı durduruyordu. Bu yüzden sadece telefonda/masaüstünde açık.
+const kOnlineCovers = !kIsWeb;
 
 class CoverHit {
   final Uint8List bytes;
