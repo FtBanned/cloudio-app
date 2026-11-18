@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
@@ -75,13 +76,25 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: _pages[_index]),
-      bottomNavigationBar: Column(
+      extendBody: true, // siyahı alttakı şəffaf çubuğun arxasına qədər uzansın
+      body: SafeArea(bottom: false, child: _pages[_index]),
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [kBg.withAlpha(120), kBg.withAlpha(235)],
+              ),
+            ),
+            child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const MiniPlayer(),
           NavigationBar(
-            backgroundColor: kBg,
+            backgroundColor: Colors.transparent,
             indicatorColor: Colors.transparent,
             selectedIndex: _index,
             onDestinationSelected: _onTap,
@@ -107,6 +120,9 @@ class _MainShellState extends State<MainShell> {
             ],
           ),
         ],
+      ),
+          ),
+        ),
       ),
     );
   }
@@ -278,13 +294,18 @@ class MiniPlayer extends StatelessWidget {
 
         return GestureDetector(
           onTap: () => _openFull(context),
-          child: AnimatedContainer(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: AnimatedContainer(
             duration: const Duration(milliseconds: 400),
-            margin: const EdgeInsets.symmetric(horizontal: 8),
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
             decoration: BoxDecoration(
-              color: shadeTint(song.tint, const Color(0xFF1B3A28)),
-              borderRadius: BorderRadius.circular(8),
+              color: shadeTint(song.tint, const Color(0xFF1B3A28))
+                  .withAlpha(215),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -338,6 +359,9 @@ class MiniPlayer extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
               ],
+            ),
+                ),
+              ),
             ),
           ),
         );
@@ -431,6 +455,12 @@ class NowPlayingPage extends StatelessWidget {
                     ),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    if (song.lyrics != null && song.lyrics!.synced)
+                      _CoverLyricLine(
+                        key: ValueKey(song.lyrics),
+                        lyrics: song.lyrics!,
+                      ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -550,6 +580,88 @@ class NowPlayingPage extends StatelessWidget {
   }
 }
 
+/// Tam ekran oynatıcıda cover-in altındakı cari söz sətri: mahnı getdikcə yuxarı sürüşərək dəyişir.
+class _CoverLyricLine extends StatefulWidget {
+  final Lyrics lyrics;
+  const _CoverLyricLine({super.key, required this.lyrics});
+
+  @override
+  State<_CoverLyricLine> createState() => _CoverLyricLineState();
+}
+
+class _CoverLyricLineState extends State<_CoverLyricLine> {
+  final c = PlayerController.instance;
+  StreamSubscription<Duration>? _sub;
+  int _idx = -1;
+
+  static const _lookahead = Duration(milliseconds: 250);
+
+  @override
+  void initState() {
+    super.initState();
+    _idx = widget.lyrics.indexAt(c.player.position + _lookahead);
+    _sub = c.player.positionStream.listen(_onPos);
+  }
+
+  void _onPos(Duration pos) {
+    final i = widget.lyrics.indexAt(pos + _lookahead);
+    if (i == _idx || !mounted) return;
+    setState(() => _idx = i);
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = widget.lyrics.lines;
+    var text = '';
+    if (_idx >= 0 && _idx < lines.length) {
+      text = lines[_idx].text.trim();
+      if (text.isEmpty) text = '♪';
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openLyricsPage(context),
+      child: SizedBox(
+        height: 30,
+        width: double.infinity,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.5),
+                end: Offset.zero,
+              ).animate(anim),
+              child: child,
+            ),
+          ),
+          child: Align(
+            key: ValueKey<int>(_idx),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SeekBar extends StatelessWidget {
   const SeekBar({super.key});
 
@@ -616,7 +728,8 @@ class HomePage extends StatelessWidget {
       builder: (context, _) {
         final count = c.songs.length < 6 ? c.songs.length : 6;
         return ListView(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.only(
+              bottom: 16 + MediaQuery.of(context).padding.bottom),
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
