@@ -489,6 +489,37 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     return l.length > 10 ? l.sublist(0, 10) : l;
   }
 
+  // ---- "Sırada" kartı: mahnı bitməzdən ~10 san əvvəl növbəti mahnını göstərir ----
+  Song? upNextSong; // kartda göstərilən növbəti mahnı
+  bool upNextVisible = false;
+  Song? _upNextFor; // kart hansı mahnı üçün göstərilib (hər mahnıda bir dəfə)
+  Timer? _upNextTimer;
+
+  void _maybeShowUpNext(Song s, Duration pos) {
+    if (_upNextFor == s || repeatKind == RepeatKind.one || sleepAtSongEnd) return;
+    final dur = s.duration ?? player.duration;
+    if (dur == null || dur < const Duration(seconds: 40)) return;
+    final rem = dur - pos;
+    if (rem > const Duration(seconds: 10) || rem < const Duration(seconds: 2)) {
+      return;
+    }
+    final idx = _peekNextIndex();
+    if (idx == null) return; // sonuncu mahnıdır
+    _upNextFor = s;
+    upNextSong = _queue[idx];
+    upNextVisible = true;
+    _upNextTimer?.cancel();
+    _upNextTimer = Timer(const Duration(seconds: 7), dismissUpNext);
+    notifyListeners();
+  }
+
+  void dismissUpNext() {
+    _upNextTimer?.cancel();
+    if (!upNextVisible) return;
+    upNextVisible = false;
+    notifyListeners();
+  }
+
   void _onPosition(Duration pos) {
     final s = _markSong;
     if (s == null || !player.playing) return;
@@ -496,6 +527,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (nowMs - _lastPosSave >= 3000) _savePositionNow(pos);
     _crossfadeTick(pos);
+    if (upNextVisible && !identical(s, _upNextFor)) dismissUpNext(); // mahnı dəyişib
+    _maybeShowUpNext(s, pos);
     if (!_markedRecent && pos >= const Duration(seconds: 5)) {
       _markedRecent = true;
       s.lastPlayedMs = DateTime.now().millisecondsSinceEpoch;

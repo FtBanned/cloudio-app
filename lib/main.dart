@@ -365,8 +365,113 @@ class CloudioApp extends StatelessWidget {
         title: 'Cloudio',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.instance.themeData,
+        // "Sırada" kartı bütün ekranların (Now Playing daxil) üstündə göstərilir
+        builder: (context, child) => Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const _UpNextOverlay(),
+          ],
+        ),
         home: const MainShell(),
       ),
+    );
+  }
+}
+
+/// Mahnı bitməzdən az əvvəl yuxarıdan sürüşən kiçik "Sırada" kartı.
+/// Toxunanda növbəti mahnıya keçir, ✕ ilə bağlanır, 7 saniyədən sonra özü itir.
+class _UpNextOverlay extends StatelessWidget {
+  const _UpNextOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    final top = MediaQuery.of(context).padding.top;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final song = c.upNextSong;
+        final visible = c.upNextVisible && song != null;
+        return Positioned(
+          top: top + 8,
+          left: 12,
+          right: 12,
+          child: IgnorePointer(
+            ignoring: !visible,
+            child: AnimatedSlide(
+              offset: visible ? Offset.zero : const Offset(0, -1.6),
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: visible ? 1 : 0,
+                duration: const Duration(milliseconds: 250),
+                child: song == null
+                    ? const SizedBox.shrink()
+                    : DarkZone(
+                        child: GestureDetector(
+                          onTap: () {
+                            c.dismissUpNext();
+                            c.next();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF282828),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: kGreen.withValues(alpha: 0.5)),
+                              boxShadow: const [
+                                BoxShadow(
+                                    color: Colors.black54,
+                                    blurRadius: 16,
+                                    offset: Offset(0, 6)),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Cover(size: 44, bytes: song.cover),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text('SIRADA',
+                                          style: TextStyle(
+                                              color: kGreen,
+                                              fontSize: 10,
+                                              letterSpacing: 1,
+                                              fontWeight: FontWeight.bold)),
+                                      Text(song.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
+                                      Text(song.artist,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              color: Colors.white60,
+                                              fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close,
+                                      size: 20, color: Colors.white54),
+                                  onPressed: c.dismissUpNext,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
