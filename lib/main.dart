@@ -1077,9 +1077,9 @@ class NowPlayingPage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         IconButton(
-                          icon: Icon(Icons.shuffle,
+                          icon: Icon(shuffleIconFor(c),
                               color: c.shuffleOn ? kGreen : Colors.white),
-                          onPressed: c.toggleShuffle,
+                          onPressed: () => showShuffleSheet(context),
                         ),
                         IconButton(
                           iconSize: 40,
@@ -1192,6 +1192,66 @@ class _SleepTimerButton extends StatelessWidget {
       },
     );
   }
+}
+
+IconData shuffleIconFor(PlayerController c) =>
+    c.smartShuffle ? Icons.auto_awesome : Icons.shuffle;
+
+/// Qarışıq çalma seçimi: Qarışıq / Ağıllı mix (seçilmiş olana yenidən toxunmaq söndürür).
+void showShuffleSheet(BuildContext context) {
+  final c = PlayerController.instance;
+  Widget option(BuildContext ctx, ShuffleMode m, IconData icon, String title,
+      String sub) {
+    final on = c.shuffleMode == m;
+    return ListTile(
+      leading: Icon(icon, color: on ? kGreen : Colors.white70),
+      title: Text(title,
+          style: TextStyle(
+              color: on ? kGreen : Colors.white, fontWeight: FontWeight.w600)),
+      subtitle: Text(sub,
+          style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      trailing: on ? const Icon(Icons.check, color: kGreen) : null,
+      onTap: () {
+        Navigator.pop(ctx);
+        c.setShuffleMode(on ? ShuffleMode.off : m);
+      },
+    );
+  }
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Qarışıq çalma',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          option(ctx, ShuffleMode.normal, Icons.shuffle, 'Qarışıq',
+              'Siyahı tam təsadüfi sırada çalınır.'),
+          option(ctx, ShuffleMode.smart, Icons.auto_awesome, 'Ağıllı mix',
+              'Çox dinlədiklərin və çoxdandır çalmadıqların irəli çəkilir, '
+                  'bu gün çalınanlar geri düşür, eyni sənətçi ardıcıl gəlmir.'),
+          if (c.shuffleOn)
+            ListTile(
+              leading: const Icon(Icons.close, color: Colors.white70),
+              title: const Text('Söndür'),
+              onTap: () {
+                Navigator.pop(ctx);
+                c.setShuffleMode(ShuffleMode.off);
+              },
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Yuxu taymeri variantları.
@@ -2215,10 +2275,10 @@ class _CollectionPageState extends State<CollectionPage> {
                         ],
                         const Spacer(),
                         IconButton(
-                          icon: Icon(Icons.shuffle,
+                          icon: Icon(shuffleIconFor(c),
                               size: 28,
                               color: c.shuffleOn ? kGreen : Colors.white),
-                          onPressed: c.toggleShuffle,
+                          onPressed: () => showShuffleSheet(context),
                         ),
                         const SizedBox(width: 4),
                         Container(

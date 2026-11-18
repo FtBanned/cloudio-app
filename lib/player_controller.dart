@@ -31,6 +31,9 @@ const kCoverSearchVersion = 2;
 /// Əlavə oluna bilən səs faylı uzantıları (seçici hamısını göstərir, burada süzülür).
 const kAudioExts = ['mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'opus'];
 
+/// off: qarışıq söndürülüb, normal: tam təsadüfi, smart: ağıllı mix (zövqünə görə çəkili).
+enum ShuffleMode { off, normal, smart }
+
 enum LyricsStatus { idle, loading, found, notFound, error }
 
 /// Kapak durumu: idle = henüz aranmadı / ağ hatası, found = bulundu, none = kaynaklarda yok.
@@ -154,7 +157,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   /// Şu an çalan listenin kopyası: next/previous bunun üstünde döner.
   List<Song> _queue = [];
   int? currentIndex; // _queue içindeki yer
-  bool shuffleOn = false;
+  ShuffleMode shuffleMode = ShuffleMode.off;
+  bool get shuffleOn => shuffleMode != ShuffleMode.off;
+  bool get smartShuffle => shuffleMode == ShuffleMode.smart;
   bool loading = false;
   RepeatKind repeatKind = RepeatKind.off;
   String? _currentBlobUrl;
@@ -382,6 +387,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       cur: currentIndex,
       pos: _pos,
       shuffle: shuffleOn,
+      smart: smartShuffle,
       repeat: repeatKind.index,
       name: queueName,
     )));
@@ -422,7 +428,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
       _queue = queue;
       queueName = q.name.isEmpty ? 'Tüm Şarkılar' : q.name;
-      shuffleOn = q.shuffle;
+      shuffleMode = !q.shuffle
+          ? ShuffleMode.off
+          : (q.smart ? ShuffleMode.smart : ShuffleMode.normal);
       repeatKind = RepeatKind.values[q.repeat.clamp(0, 2)];
       if (shuffleOn) {
         final okOrder = queue.length == q.ids.length &&
@@ -1391,8 +1399,12 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     _savePositionNow(position);
   }
 
-  void toggleShuffle() {
-    shuffleOn = !shuffleOn;
+  void toggleShuffle() =>
+      setShuffleMode(shuffleOn ? ShuffleMode.off : ShuffleMode.normal);
+
+  /// Qarışıq rejimini seçir (Spotify kimi: Qarışıq / Ağıllı mix / söndür).
+  void setShuffleMode(ShuffleMode m) {
+    shuffleMode = m;
     if (shuffleOn) _buildShuffle(first: currentIndex); // çalan mahnı sıranın əvvəlində qalır
     _saveQueueState();
     notifyListeners();
@@ -1410,13 +1422,70 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
   /// [first] verilərsə həmin mahnı sıranın əvvəlində olur.
   void _buildShuffle({int? first}) {
-    final idx = List<int>.generate(_queue.length, (i) => i)..shuffle(_rng);
+    final idx = smartShuffle
+        ? _smartOrder()
+        : (List<int>.generate(_queue.length, (i) => i)..shuffle(_rng));
     if (first != null && first >= 0 && first < idx.length) {
       idx.remove(first);
       idx.insert(0, first);
     }
+    if (smartShuffle) _spreadArtists(idx);
     _order = idx;
     _pos = 0;
+  }
+
+  // ---- Ağıllı mix: hər mahnıya çəki verilir, çəkili təsadüfi sıra qurulur ----
+  /// Çəki nə qədər böyükdürsə, mahnı sıranın əvvəlinə o qədər çox düşür.
+  /// - çox dinlədiklərin və bəyəndiklərin irəli çəkilir;
+  /// - çoxdandır (30+ gün) çalınmayan sevimlilər "yenidən kəşf" üçün irəli çəkilir;
+  /// - heç çalınmamışlara kiçik bonus verilir;
+  /// - bu gün çalınanlar geri atılır ki, təkrar eşitməyəsən.
+  double _smartWeight(Song s, int nowMs) {
+    var w = 1.0 + log(1 + s.playCount) * 0.9;
+    if (s.liked) w *= 1.5;
+    if (s.lastPlayedMs > 0) {
+      final days = (nowMs - s.lastPlayedMs) / 86400000;
+      if (days < 1) {
+        w *= 0.35;
+      } else if (days > 30 && s.playCount >= 2) {
+        w *= 1.8;
+      }
+    } else {
+      w *= 1.2;
+    }
+    return w;
+  }
+
+  /// Çəkili təsadüfi sıra (Efraimidis–Spirakis): açar = u^(1/w), böyükdən kiçiyə.
+  List<int> _smartOrder() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final keys = <int, double>{};
+    for (var i = 0; i < _queue.length; i++) {
+      final w = _smartWeight(_queue[i], now);
+      final u = max(_rng.nextDouble(), 1e-9);
+      keys[i] = pow(u, 1 / w).toDouble();
+    }
+    final idx = List<int>.generate(_queue.length, (i) => i)
+      ..sort((a, b) => keys[b]!.compareTo(keys[a]!));
+    return idx;
+  }
+
+  /// Eyni sənətçinin mahnıları ardıcıl gəlməsin (yaxın olan fərqli sənətçi ilə yer dəyişir).
+  void _spreadArtists(List<int> idx) {
+    bool known(String a) => a.trim().isNotEmpty && a != kUnknownArtist;
+    for (var i = 1; i < idx.length; i++) {
+      final a = _queue[idx[i]].artist;
+      if (!known(a) || a != _queue[idx[i - 1]].artist) continue;
+      final end = min(idx.length, i + 8);
+      for (var j = i + 1; j < end; j++) {
+        if (_queue[idx[j]].artist != a) {
+          final t = idx[i];
+          idx[i] = idx[j];
+          idx[j] = t;
+          break;
+        }
+      }
+    }
   }
 
   bool get _shuffleActive => shuffleOn && _queue.length > 1;
@@ -1586,7 +1655,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> shuffle({List<Song>? context}) async {
     final list = context ?? songs;
     if (list.isEmpty) return;
-    shuffleOn = true;
+    if (!shuffleOn) shuffleMode = ShuffleMode.normal; // Ağıllı mix seçilibsə qalır
     _queue = List.of(list);
     queueName = _nameFor(context);
     _buildShuffle();

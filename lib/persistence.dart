@@ -92,6 +92,7 @@ class SavedQueue {
   final int? cur; // ids içində hazırkı mahnı
   final int pos; // order içində hazırkı yer
   final bool shuffle;
+  final bool smart; // true: Ağıllı mix (shuffle ilə birlikdə)
   final int repeat; // RepeatKind.index
   final String name;
   SavedQueue({
@@ -100,6 +101,7 @@ class SavedQueue {
     required this.cur,
     required this.pos,
     required this.shuffle,
+    this.smart = false,
     required this.repeat,
     required this.name,
   });
@@ -381,6 +383,7 @@ class CloudioStore {
         'cur': q.cur,
         'pos': q.pos,
         'shuffle': q.shuffle,
+        'smart': q.smart,
         'repeat': q.repeat,
         'name': q.name,
       });
@@ -401,6 +404,7 @@ class CloudioStore {
         cur: m['cur'] as int?,
         pos: m['pos'] as int? ?? 0,
         shuffle: m['shuffle'] as bool? ?? false,
+        smart: m['smart'] as bool? ?? false,
         repeat: m['repeat'] as int? ?? 0,
         name: m['name'] as String? ?? '',
       );

@@ -150,10 +150,10 @@ class _QueuePageState extends State<QueuePage> {
                     children: [
                       Expanded(
                         child: _QueueButton(
-                          icon: Icons.shuffle,
-                          label: 'Karışık çal',
+                          icon: shuffleIconFor(c),
+                          label: c.smartShuffle ? 'Ağıllı mix' : 'Karışık çal',
                           active: c.shuffleOn,
-                          onTap: c.toggleShuffle,
+                          onTap: () => showShuffleSheet(context),
                         ),
                       ),
                       const SizedBox(width: 8),
