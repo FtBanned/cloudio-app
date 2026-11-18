@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import 'app_theme.dart';
 import 'main.dart'
@@ -412,15 +413,9 @@ class _ProfileCard extends StatelessWidget {
     final since = c.profileSince;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.all(18),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [dark, const Color(0xFF121212)],
-        ),
-        border: Border.all(color: light.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
               color: light.withValues(alpha: 0.20),
@@ -428,7 +423,17 @@ class _ProfileCard extends StatelessWidget {
               offset: const Offset(0, 8)),
         ],
       ),
-      child: DarkZone(
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: light.withValues(alpha: 0.35)),
+      ),
+      child: Stack(
+        children: [
+          // Foto + animasiyalı video fon (üstündə profil rənginə uyğun tünd qat)
+          Positioned.fill(child: _AdminBackdrop(tint: dark)),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: DarkZone(
           child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -499,6 +504,9 @@ class _ProfileCard extends StatelessWidget {
               style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -587,6 +595,89 @@ class _ProfileCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Admin kartının fonu: əvvəl foto görünür, video hazır olanda səssiz və dövrlə oynayır.
+/// Video açılmasa (xəta) foto qalır, tətbiq işləməyə davam edir.
+class _AdminBackdrop extends StatefulWidget {
+  final Color tint;
+  const _AdminBackdrop({required this.tint});
+
+  @override
+  State<_AdminBackdrop> createState() => _AdminBackdropState();
+}
+
+class _AdminBackdropState extends State<_AdminBackdrop> {
+  VideoPlayerController? _vc;
+  bool _ready = false;
+  bool _gone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      final vc = VideoPlayerController.asset(
+        'assets/admin_bg.mp4',
+        // Musiqini kəsməsin: səs sessiyası digər səslərlə qarışsın
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      _vc = vc;
+      await vc.initialize();
+      if (_gone) return; // dispose() artıq controller-i bağlayıb
+      await vc.setVolume(0);
+      await vc.setLooping(true);
+      await vc.play();
+      if (_gone) return;
+      setState(() => _ready = true);
+    } catch (e) {
+      debugPrint('Admin fon videosu açılmadı: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _gone = true;
+    _vc?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vc = _vc;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset('assets/admin_bg.jpg', fit: BoxFit.cover),
+        if (_ready && vc != null)
+          FittedBox(
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: vc.value.size.width,
+              height: vc.value.size.height,
+              child: VideoPlayer(vc),
+            ),
+          ),
+        // Yazıların oxunması üçün tünd qat (profil rəngi ilə)
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                widget.tint.withValues(alpha: 0.35),
+                const Color(0xFF121212).withValues(alpha: 0.85),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

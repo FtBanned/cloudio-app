@@ -44,6 +44,7 @@ dependencies:
   path_provider: ^2.1.6
   audio_service: ^0.18.19
   audio_session: ^0.2.2
+  video_player: ^2.9.0
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +67,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/admin_bg.jpg
+    - assets/admin_bg.mp4
 
   # To add assets to your application, add an assets section, like this:
   # assets:
