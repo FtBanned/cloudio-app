@@ -1,0 +1,1956 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
+
+import 'cover_lookup.dart' show kOnlineCovers;
+import 'lyrics.dart';
+import 'player_controller.dart';
+import 'queue_page.dart';
+
+void main() => runApp(const CloudioApp());
+
+const kGreen = Color(0xFF1DB954);
+const kBg = Color(0xFF121212);
+const kCard = Color(0xFF2A2A2A);
+
+String formatDuration(Duration d) {
+  if (d.isNegative) d = Duration.zero;
+  final m = d.inMinutes;
+  final s = d.inSeconds % 60;
+  return '$m:${s.toString().padLeft(2, '0')}';
+}
+
+/// Kapağın ortalama rengini arka plan için koyulaştırır (Spotify gibi).
+Color shadeTint(Color? c, Color fallback) {
+  if (c == null) return fallback;
+  final h = HSLColor.fromColor(c);
+  return h
+      .withLightness((h.lightness * 0.55).clamp(0.10, 0.30).toDouble())
+      .withSaturation(h.saturation.clamp(0.0, 0.75).toDouble())
+      .toColor();
+}
+
+class CloudioApp extends StatelessWidget {
+  const CloudioApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Cloudio',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: kBg,
+        colorScheme: const ColorScheme.dark(primary: kGreen),
+        useMaterial3: true,
+      ),
+      home: const MainShell(),
+    );
+  }
+}
+
+// ================= Ana iskelet =================
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
+
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  int _index = 0;
+
+  final _pages = const [HomePage(), SearchPage(), LibraryPage()];
+
+  void _onTap(int i) {
+    if (i == 3) {
+      showCreateSheet(context);
+      return;
+    }
+    setState(() => _index = i);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(child: _pages[_index]),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MiniPlayer(),
+          NavigationBar(
+            backgroundColor: kBg,
+            indicatorColor: Colors.transparent,
+            selectedIndex: _index,
+            onDestinationSelected: _onTap,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Ana Sayfa',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.search),
+                label: 'Arama',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.library_music_outlined),
+                selectedIcon: Icon(Icons.library_music),
+                label: 'Kitaplığın',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.add),
+                label: 'Oluştur',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void showCreateSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Colors.white12,
+              child: Icon(Icons.music_note),
+            ),
+            title: const Text('Çalma Listesi',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Şarkı içeren bir çalma listesi oluştur'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              final name = await askText(context,
+                  title: 'Çalma listesine ad ver',
+                  initial: 'Çalma listem #${PlayerController.instance.playlists.length + 1}');
+              if (name == null || !context.mounted) return;
+              final pl = PlayerController.instance.createPlaylist(name);
+              openPlaylist(context, pl);
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
+}
+
+// ================= Ortak küçük parçalar =================
+class Cover extends StatelessWidget {
+  final double size;
+  final Uint8List? bytes;
+  const Cover({super.key, this.size = 48, this.bytes});
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      color: Colors.grey.shade800,
+      child: Icon(Icons.music_note, size: size * 0.5),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: bytes == null
+            ? placeholder
+            : Image.memory(
+                bytes!,
+                fit: BoxFit.cover,
+                cacheWidth: (size * 3).round(),
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => placeholder,
+              ),
+      ),
+    );
+  }
+}
+
+class SongTile extends StatelessWidget {
+  final Song song;
+  final List<Song>? queue; // tıklanınca çalacak liste (null = tüm şarkılar)
+  final Playlist? playlist; // bir çalma listesinin içindeysek
+  const SongTile({super.key, required this.song, this.queue, this.playlist});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListTile(
+      selected: c.current == song,
+      selectedColor: kGreen,
+      leading: Cover(size: 48, bytes: song.cover),
+      title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(song.artist,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white60)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (song.liked)
+            const Icon(Icons.check_circle, color: kGreen, size: 20),
+          IconButton(
+            icon: const Icon(Icons.more_horiz),
+            onPressed: () => showSongMenu(context, song, playlist: playlist),
+          ),
+        ],
+      ),
+      onTap: () => c.playSong(song, context: queue),
+    );
+  }
+}
+
+class ProfileAvatar extends StatelessWidget {
+  const ProfileAvatar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const CircleAvatar(
+      radius: 18,
+      backgroundColor: Colors.deepOrange,
+      child: Icon(Icons.person, size: 20, color: Colors.white),
+    );
+  }
+}
+
+class FilterPill extends StatelessWidget {
+  final String label;
+  final bool selected;
+  const FilterPill(this.label, {super.key, this.selected = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? kGreen : kCard,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? Colors.black : Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// ================= Mini oynatıcı =================
+class MiniPlayer extends StatelessWidget {
+  const MiniPlayer({super.key});
+
+  void _openFull(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const NowPlayingPage(),
+        transitionsBuilder: (_, anim, __, child) => SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+              .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final song = c.current;
+        if (song == null) return const SizedBox.shrink();
+
+        return GestureDetector(
+          onTap: () => _openFull(context),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            decoration: BoxDecoration(
+              color: shadeTint(song.tint, const Color(0xFF1B3A28)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Cover(size: 44, bytes: song.cover),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(song.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow,
+                          size: 30),
+                      onPressed: c.togglePlay,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                StreamBuilder<Duration>(
+                  stream: c.player.positionStream,
+                  builder: (context, snap) {
+                    final dur = c.player.duration?.inMilliseconds ?? 0;
+                    final pos = snap.data?.inMilliseconds ?? 0;
+                    final v =
+                        dur <= 0 ? 0.0 : (pos / dur).clamp(0.0, 1.0).toDouble();
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: v,
+                        minHeight: 2,
+                        backgroundColor: Colors.white24,
+                        color: Colors.white,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ================= Tam ekran oynatıcı =================
+class NowPlayingPage extends StatelessWidget {
+  const NowPlayingPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final song = c.current;
+        if (song == null) return const Scaffold();
+
+        final top = shadeTint(song.tint, const Color(0xFF3A2E5C));
+
+        return Scaffold(
+          body: AnimatedContainer(
+            duration: const Duration(milliseconds: 500),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [top, kBg],
+                stops: const [0.0, 0.7],
+              ),
+            ),
+            child: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  // İlk ekran oynatıcı; altta söz kartının üst kısmı görünür kalır (Spotify gibi)
+                  final firstH =
+                      box.maxHeight - 72 < 520 ? 520.0 : box.maxHeight - 72;
+                  return SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: firstH,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 32),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Çalıyor',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.more_horiz),
+                          onPressed: () => showSongMenu(context, song),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: song.cover == null
+                              ? Container(
+                                  color: Colors.grey.shade800,
+                                  child:
+                                      const Icon(Icons.music_note, size: 96),
+                                )
+                              : Image.memory(
+                                  song.cover!,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 900,
+                                  gaplessPlayback: true,
+                                ),
+                        ),
+                      ),
+                    ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                song.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 24, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                song.album.isEmpty
+                                    ? song.artist
+                                    : '${song.artist} • ${song.album}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 16, color: Colors.white60),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          iconSize: 30,
+                          tooltip: song.liked ? 'Beğenmekten vazgeç' : 'Beğen',
+                          icon: Icon(
+                            song.liked
+                                ? Icons.check_circle
+                                : Icons.add_circle_outline,
+                            color: song.liked ? kGreen : Colors.white70,
+                          ),
+                          onPressed: () => c.toggleLike(song),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const SeekBar(),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.shuffle,
+                              color: c.shuffleOn ? kGreen : Colors.white),
+                          onPressed: c.toggleShuffle,
+                        ),
+                        IconButton(
+                          iconSize: 40,
+                          icon: const Icon(Icons.skip_previous),
+                          onPressed: c.previous,
+                        ),
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            iconSize: 40,
+                            color: Colors.black,
+                            icon: Icon(
+                                c.isPlaying ? Icons.pause : Icons.play_arrow),
+                            onPressed: c.togglePlay,
+                          ),
+                        ),
+                        IconButton(
+                          iconSize: 40,
+                          icon: const Icon(Icons.skip_next),
+                          onPressed: c.next,
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            c.repeatKind == RepeatKind.one
+                                ? Icons.repeat_one
+                                : Icons.repeat,
+                            color: c.repeatKind == RepeatKind.off
+                                ? Colors.white
+                                : kGreen,
+                          ),
+                          onPressed: c.cycleRepeat,
+                        ),
+                      ],
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        tooltip: 'Sıra',
+                        icon: const Icon(Icons.queue_music),
+                        onPressed: () => openQueue(context),
+                      ),
+                    ),
+                  ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: LyricsCard(song: song),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class SeekBar extends StatelessWidget {
+  const SeekBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return StreamBuilder<Duration>(
+      stream: c.player.positionStream,
+      builder: (context, snap) {
+        final pos = snap.data ?? Duration.zero;
+        final dur = c.player.duration ?? Duration.zero;
+        final maxMs = dur.inMilliseconds;
+        final posMs = pos.inMilliseconds.clamp(0, maxMs <= 0 ? 0 : maxMs);
+
+        return Column(
+          children: [
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape:
+                    const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.white24,
+                thumbColor: Colors.white,
+              ),
+              child: Slider(
+                value: posMs.toDouble(),
+                min: 0,
+                max: maxMs <= 0 ? 1 : maxMs.toDouble(),
+                onChanged: (v) => c.seek(Duration(milliseconds: v.toInt())),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(formatDuration(pos),
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.white60)),
+                  Text('-${formatDuration(dur - pos)}',
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.white60)),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ================= Ana Sayfa =================
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final count = c.songs.length < 6 ? c.songs.length : 6;
+        return ListView(
+          padding: const EdgeInsets.only(bottom: 16),
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  ProfileAvatar(),
+                  SizedBox(width: 12),
+                  FilterPill('Tümü', selected: true),
+                  SizedBox(width: 8),
+                  FilterPill('Müzik'),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Dinlemeye başla',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            ),
+            if (c.songs.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(
+                  child: Text(
+                    'Henüz şarkı yok.\nKitaplığın sekmesinden şarkı ekle.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                ),
+              ),
+            for (var i = 0; i < count; i++) SongTile(song: c.songs[i]),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ================= Arama =================
+class SearchPage extends StatefulWidget {
+  const SearchPage({super.key});
+
+  @override
+  State<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends State<SearchPage> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final q = _query.trim().toLowerCase();
+        final matches = <int>[
+          for (var i = 0; i < c.songs.length; i++)
+            if (q.isNotEmpty &&
+                (c.songs[i].title.toLowerCase().contains(q) ||
+                    c.songs[i].artist.toLowerCase().contains(q) ||
+                    c.songs[i].album.toLowerCase().contains(q)))
+              i,
+        ];
+
+        final matchSongs = [for (final i in matches) c.songs[i]];
+
+        // Başlıq və axtarış xanası sabit qalır, nəticələr aşağıda sürüşür
+        // (xana siyahının içində olsaydı, aşağı sürüşəndə yazılan mətn itərdi).
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            children: [
+              const Row(
+                children: [
+                  ProfileAvatar(),
+                  SizedBox(width: 12),
+                  Text('Ara',
+                      style:
+                          TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                onChanged: (v) => setState(() => _query = v),
+                style: const TextStyle(color: Colors.black),
+                cursorColor: Colors.black,
+                decoration: InputDecoration(
+                  hintText: 'Ne dinlemek istiyorsun?',
+                  hintStyle: const TextStyle(color: Colors.black54),
+                  prefixIcon: const Icon(Icons.search, color: Colors.black),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: q.isEmpty
+                    ? SingleChildScrollView(
+                        child: GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 2.0,
+                          children: const [
+                            CategoryTile('Müzik', Color(0xFFE91E8C)),
+                            CategoryTile('Podcast\'ler', Color(0xFF00695C)),
+                            CategoryTile('Sesli kitaplar', Color(0xFF283593)),
+                            CategoryTile('Canlı Etkinlikler', Color(0xFF8E24AA)),
+                          ],
+                        ),
+                      )
+                    : matchSongs.isEmpty
+                        ? const Center(
+                            child: Text('Sonuç bulunamadı',
+                                style: TextStyle(color: Colors.white60)),
+                          )
+                        : ListView.builder(
+                            itemCount: matchSongs.length,
+                            itemBuilder: (context, i) => SongTile(
+                              key: ValueKey(matchSongs[i].id),
+                              song: matchSongs[i],
+                              queue: matchSongs,
+                            ),
+                          ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class CategoryTile extends StatelessWidget {
+  final String label;
+  final Color color;
+  const CategoryTile(this.label, this.color, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      alignment: Alignment.topLeft,
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+// ================= Kitaplığın =================
+class LibraryPage extends StatelessWidget {
+  const LibraryPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final liked = c.likedSongs;
+        return ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Kitaplığın',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                  ),
+                  if (kOnlineCovers)
+                    IconButton(
+                      icon: Icon(c.coversRunning ? Icons.close : Icons.refresh,
+                          size: 26),
+                      tooltip: c.coversRunning
+                          ? 'Kapak aramasını durdur'
+                          : 'Listeyi yenile (eksik kapakları bul)',
+                      onPressed: c.coversRunning
+                          ? c.cancelCovers
+                          : () => c.refreshCovers(retryNone: true),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 28),
+                    tooltip: 'Şarkı ekle',
+                    onPressed: c.loading ? null : c.addSongs,
+                  ),
+                ],
+              ),
+            ),
+            if (c.loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            if (c.coversRunning)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      minHeight: 2,
+                      value: c.coversTotal == 0
+                          ? null
+                          : c.coversDone / c.coversTotal,
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Kapaklar aranıyor… ${c.coversDone}/${c.coversTotal}',
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.white60)),
+                  ],
+                ),
+              )
+            else if (c.coversNote != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(c.coversNote!,
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white60)),
+              ),
+            _CollectionRow(
+              leading: const _IconSquare(
+                  Icons.favorite, [Color(0xFF4A2BD8), Color(0xFF9DB6E8)]),
+              title: 'Beğenilen Şarkılar',
+              subtitle: 'Çalma listesi • ${liked.length} şarkı',
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const CollectionPage.liked(),
+              )),
+            ),
+            _CollectionRow(
+              leading: const _IconSquare(
+                  Icons.library_music, [Color(0xFF1B6B3A), kGreen]),
+              title: 'Tüm Şarkılar',
+              subtitle: 'Kitaplık • ${c.songs.length} şarkı',
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const CollectionPage.all(),
+              )),
+            ),
+            for (final p in c.playlists)
+              _CollectionRow(
+                leading: MosaicCover(songs: p.songs, size: 56),
+                title: p.name,
+                subtitle: 'Çalma listesi • ${p.songs.length} şarkı',
+                onTap: () => openPlaylist(context, p),
+              ),
+            if (c.songs.isEmpty && !c.loading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(
+                  child: Text(
+                    'Henüz şarkı yok.\nSağ üstteki + ile şarkı ekle.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CollectionRow extends StatelessWidget {
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _CollectionRow({
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: leading,
+      title: Text(title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(color: Colors.white60, fontSize: 13)),
+      onTap: onTap,
+    );
+  }
+}
+
+class _IconSquare extends StatelessWidget {
+  final IconData icon;
+  final List<Color> colors;
+  final double size;
+  const _IconSquare(this.icon, this.colors, {this.size = 56});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: colors,
+          ),
+        ),
+        child: Icon(icon, size: size * 0.45, color: Colors.white),
+      ),
+    );
+  }
+}
+
+/// Liste kapağı: kapaklı 4+ şarkı varsa 2x2 mozaik, yoksa ilk kapak.
+class MosaicCover extends StatelessWidget {
+  final List<Song> songs;
+  final double size;
+  const MosaicCover({super.key, required this.songs, this.size = 56});
+
+  @override
+  Widget build(BuildContext context) {
+    final covers = [
+      for (final s in songs)
+        if (s.cover != null) s.cover!,
+    ];
+    if (covers.length < 4) {
+      return Cover(size: size, bytes: covers.isEmpty ? null : covers.first);
+    }
+    final half = size / 2;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Column(
+          children: [
+            Row(children: [
+              _tile(covers[0], half),
+              _tile(covers[1], half),
+            ]),
+            Row(children: [
+              _tile(covers[2], half),
+              _tile(covers[3], half),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tile(Uint8List b, double s) => SizedBox(
+        width: s,
+        height: s,
+        child: Image.memory(b,
+            fit: BoxFit.cover,
+            cacheWidth: (s * 3).round(),
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade800)),
+      );
+}
+
+// ================= Liste sayfası =================
+void openPlaylist(BuildContext context, Playlist p) {
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => CollectionPage.playlist(p),
+  ));
+}
+
+enum _CollectionKind { all, liked, playlist }
+
+class CollectionPage extends StatelessWidget {
+  final _CollectionKind kind;
+  final Playlist? playlistRef;
+
+  const CollectionPage.all({super.key})
+      : kind = _CollectionKind.all,
+        playlistRef = null;
+  const CollectionPage.liked({super.key})
+      : kind = _CollectionKind.liked,
+        playlistRef = null;
+  const CollectionPage.playlist(Playlist p, {super.key})
+      : kind = _CollectionKind.playlist,
+        playlistRef = p;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final pl = playlistRef;
+        // Silinmiş bir liste açık kaldıysa sayfayı kapat
+        if (pl != null && !c.playlists.contains(pl)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) Navigator.of(context).maybePop();
+          });
+          return const Scaffold();
+        }
+
+        final List<Song> list;
+        final String title;
+        switch (kind) {
+          case _CollectionKind.all:
+            list = c.songs;
+            title = 'Tüm Şarkılar';
+          case _CollectionKind.liked:
+            list = c.likedSongs;
+            title = 'Beğenilen Şarkılar';
+          case _CollectionKind.playlist:
+            list = pl!.songs;
+            title = pl.name;
+        }
+
+        Color? tint;
+        for (final s in list) {
+          if (s.tint != null) {
+            tint = s.tint;
+            break;
+          }
+        }
+        final top = shadeTint(tint, const Color(0xFF3A2E5C));
+        final playingHere = c.isPlaying && c.current != null && list.contains(c.current);
+
+        // Siyahının başlıq hissəsi; mahnılar ListView.builder ilə tənbəl (lazy) qurulur
+        final header = <Widget>[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                  Center(
+                    child: switch (kind) {
+                      _CollectionKind.liked => const _IconSquare(
+                          Icons.favorite,
+                          [Color(0xFF4A2BD8), Color(0xFF9DB6E8)],
+                          size: 200),
+                      _ => MosaicCover(songs: list, size: 200),
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+                    child: Text(title,
+                        style: const TextStyle(
+                            fontSize: 26, fontWeight: FontWeight.bold)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('${list.length} şarkı',
+                        style: const TextStyle(color: Colors.white60)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Row(
+                      children: [
+                        if (kind != _CollectionKind.liked)
+                          _ActionPill(
+                            icon: Icons.add,
+                            label: 'Ekle',
+                            onTap: () {
+                              if (kind == _CollectionKind.all) {
+                                if (!c.loading) c.addSongs();
+                              } else {
+                                showAddSongsSheet(context, pl!);
+                              }
+                            },
+                          ),
+                        if (kind == _CollectionKind.playlist) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.more_horiz),
+                            onPressed: () => showPlaylistMenu(context, pl!),
+                          ),
+                        ],
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.shuffle,
+                              size: 28,
+                              color: c.shuffleOn ? kGreen : Colors.white),
+                          onPressed: c.toggleShuffle,
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: const BoxDecoration(
+                            color: kGreen,
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            iconSize: 32,
+                            color: Colors.black,
+                            icon: Icon(
+                                playingHere ? Icons.pause : Icons.play_arrow),
+                            onPressed: list.isEmpty
+                                ? null
+                                : () {
+                                    if (playingHere) {
+                                      c.togglePlay();
+                                    } else if (c.shuffleOn) {
+                                      c.shuffle(context: list);
+                                    } else {
+                                      c.playSong(list.first, context: list);
+                                    }
+                                  },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (list.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          switch (kind) {
+                            _CollectionKind.liked =>
+                              'Henüz beğendiğin şarkı yok.\nŞarkının yanındaki ⊕ ile beğen.',
+                            _CollectionKind.all =>
+                              'Henüz şarkı yok.\n"Ekle" ile dosya seç.',
+                            _CollectionKind.playlist =>
+                              'Bu liste boş.\n"Ekle" ile kitaplığından şarkı seç.',
+                          },
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white60),
+                        ),
+                      ),
+                    ),
+        ];
+
+        return Scaffold(
+          bottomNavigationBar: const MiniPlayer(),
+          body: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [top, kBg],
+                stops: const [0.0, 0.45],
+              ),
+            ),
+            child: SafeArea(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 16),
+                itemCount: header.length + list.length,
+                itemBuilder: (context, i) {
+                  if (i < header.length) return header[i];
+                  final s = list[i - header.length];
+                  return SongTile(
+                      key: ValueKey(s.id), song: s, queue: list, playlist: pl);
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ActionPill(
+      {required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white12,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ================= Menüler ve diyaloglar =================
+Future<String?> askText(BuildContext context,
+    {required String title, String initial = ''}) {
+  final ctrl = TextEditingController(text: initial);
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: kCard,
+      title: Text(title),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        onSubmitted: (v) => Navigator.pop(ctx, v),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('İptal'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, ctrl.text),
+          child: const Text('Tamam', style: TextStyle(color: kGreen)),
+        ),
+      ],
+    ),
+  );
+}
+
+ShapeBorder get _sheetShape => const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    );
+
+/// Şarkı "⋯" menüsü.
+void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
+  final c = PlayerController.instance;
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: Cover(size: 48, bytes: song.cover),
+            title: Text(song.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(song.artist,
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Icon(
+              song.liked ? Icons.check_circle : Icons.add_circle_outline,
+              color: song.liked ? kGreen : null,
+            ),
+            title: Text(song.liked
+                ? 'Beğenilenlerden kaldır'
+                : 'Beğenilenlere ekle'),
+            onTap: () {
+              Navigator.pop(ctx);
+              c.toggleLike(song);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.playlist_add),
+            title: const Text('Çalma listesine ekle'),
+            onTap: () {
+              Navigator.pop(ctx);
+              showPickPlaylistSheet(context, song);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.lyrics_outlined),
+            title: Text(song.lyrics == null
+                ? 'Şarkı sözü ekle (.lrc / .txt)'
+                : 'Şarkı sözünü değiştir (.lrc / .txt)'),
+            onTap: () {
+              Navigator.pop(ctx);
+              pickLyricsFor(context, song);
+            },
+          ),
+          if (playlist != null)
+            ListTile(
+              leading: const Icon(Icons.remove_circle_outline),
+              title: const Text('Bu listeden çıkar'),
+              onTap: () {
+                Navigator.pop(ctx);
+                c.removeFromPlaylist(playlist, song);
+              },
+            ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline),
+            title: const Text('Kitaplıktan sil'),
+            onTap: () {
+              Navigator.pop(ctx);
+              c.removeSong(song);
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Şarkıyı hangi listeye ekleyeceğini seçtirir (yeni liste de açılabilir).
+void showPickPlaylistSheet(BuildContext context, Song song) {
+  final c = PlayerController.instance;
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Çalma listesine ekle',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Colors.white12,
+                child: Icon(Icons.add),
+              ),
+              title: const Text('Yeni çalma listesi'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final name = await askText(context,
+                    title: 'Çalma listesine ad ver',
+                    initial: 'Çalma listem #${c.playlists.length + 1}');
+                if (name == null) return;
+                final p = c.createPlaylist(name);
+                c.addToPlaylist(p, [song]);
+              },
+            ),
+            for (final p in c.playlists)
+              ListTile(
+                leading: MosaicCover(songs: p.songs, size: 44),
+                title: Text(p.name),
+                subtitle: Text(p.songs.contains(song)
+                    ? 'Zaten listede'
+                    : '${p.songs.length} şarkı'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  c.addToPlaylist(p, [song]);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('"${p.name}" listesine eklendi')),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Kitaplıktan birden fazla şarkı seçip listeye ekler.
+void showAddSongsSheet(BuildContext context, Playlist p) {
+  final c = PlayerController.instance;
+  final candidates = [
+    for (final s in c.songs)
+      if (!p.songs.contains(s)) s,
+  ];
+  final picked = <Song>{};
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    isScrollControlled: true,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setSt) => SafeArea(
+        child: ConstrainedBox(
+          constraints:
+              BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Şarkı ekle',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                    TextButton(
+                      onPressed: picked.isEmpty
+                          ? null
+                          : () {
+                              c.addToPlaylist(p, picked);
+                              Navigator.pop(ctx);
+                            },
+                      child: Text('Ekle (${picked.length})',
+                          style: TextStyle(
+                              color: picked.isEmpty ? Colors.white30 : kGreen,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+              if (candidates.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text(
+                    'Eklenecek şarkı kalmadı.\nÖnce Kitaplığından şarkı yükle.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final s in candidates)
+                        CheckboxListTile(
+                          activeColor: kGreen,
+                          checkColor: Colors.black,
+                          secondary: Cover(size: 44, bytes: s.cover),
+                          title: Text(s.title,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(s.artist,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          value: picked.contains(s),
+                          onChanged: (v) => setSt(() {
+                            if (v == true) {
+                              picked.add(s);
+                            } else {
+                              picked.remove(s);
+                            }
+                          }),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Çalma listesi "⋯" menüsü: yeniden adlandır / sil.
+void showPlaylistMenu(BuildContext context, Playlist p) {
+  final c = PlayerController.instance;
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: const Text('Ad ve ayrıntıları düzenle'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              final name =
+                  await askText(context, title: 'Yeni ad', initial: p.name);
+              if (name != null) c.renamePlaylist(p, name);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline),
+            title: const Text('Çalma listesini sil'),
+            onTap: () {
+              Navigator.pop(ctx);
+              c.deletePlaylist(p);
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+// ================= Şarkı sözleri =================
+Color lyricsBg(Color? tint) {
+  if (tint == null) return const Color(0xFF6C63B8);
+  final h = HSLColor.fromColor(tint);
+  return h
+      .withLightness(0.34)
+      .withSaturation(h.saturation.clamp(0.25, 0.7).toDouble())
+      .toColor();
+}
+
+Future<void> pickLyricsFor(BuildContext context, Song song) async {
+  final ok = await PlayerController.instance.importLyricsFile(song);
+  if (ok == null || !context.mounted) return; // vazgeçildi
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(ok ? 'Şarkı sözü eklendi' : 'Dosyada söz bulunamadı'),
+  ));
+}
+
+void openLyricsPage(BuildContext context) {
+  Navigator.of(context).push(MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (_) => const LyricsPage(),
+  ));
+}
+
+/// Tam ekran oynatıcının altındaki renkli "Şarkı sözleri" kartı.
+class LyricsCard extends StatefulWidget {
+  final Song song;
+  const LyricsCard({super.key, required this.song});
+
+  @override
+  State<LyricsCard> createState() => _LyricsCardState();
+}
+
+class _LyricsCardState extends State<LyricsCard> {
+  @override
+  void initState() {
+    super.initState();
+    _kick();
+  }
+
+  @override
+  void didUpdateWidget(LyricsCard old) {
+    super.didUpdateWidget(old);
+    if (old.song != widget.song) _kick();
+  }
+
+  // Gömülü söz yoksa internetten ara (build sırasında notify etmemek için kare sonrası)
+  void _kick() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) PlayerController.instance.loadLyricsOnline(widget.song);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      height: 380,
+      padding: const EdgeInsets.fromLTRB(20, 4, 12, 0),
+      decoration: BoxDecoration(
+        color: lyricsBg(widget.song.tint),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => openLyricsPage(context),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text('Şarkı sözleri',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.more_horiz),
+                  onPressed: () => showLyricsMenu(context, widget.song),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.open_in_full, size: 20),
+                  tooltip: 'Tam ekran',
+                  onPressed: () => openLyricsPage(context),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: LyricsView(song: widget.song, big: false)),
+        ],
+      ),
+    );
+  }
+}
+
+void showLyricsMenu(BuildContext context, Song song) {
+  final c = PlayerController.instance;
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.upload_file),
+            title: const Text('Söz dosyası ekle (.lrc / .txt)'),
+            onTap: () {
+              Navigator.pop(ctx);
+              pickLyricsFor(context, song);
+            },
+          ),
+          if (kOnlineLyrics)
+            ListTile(
+              leading: const Icon(Icons.travel_explore),
+              title: const Text('İnternetten ara'),
+              subtitle: const Text('Şarkı adı ve sanatçı lrclib.net\'e gönderilir'),
+              onTap: () {
+                Navigator.pop(ctx);
+                c.loadLyricsOnline(song, force: true);
+              },
+            ),
+          if (song.lyrics != null)
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Sözleri kaldır'),
+              onTap: () {
+                Navigator.pop(ctx);
+                c.clearLyrics(song);
+              },
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Sözün kendisi: zamanlıysa çalan satırı vurgular ve kaydırır, değilse düz metin gösterir.
+class LyricsView extends StatelessWidget {
+  final Song song;
+  final bool big;
+  const LyricsView({super.key, required this.song, required this.big});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final l = song.lyrics;
+        if (l == null) return _LyricsEmpty(song: song);
+        if (l.synced) return _SyncedLyrics(key: ValueKey(l), lyrics: l, big: big);
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 12, bottom: 32, right: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final line in l.lines)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text(
+                    line.text.isEmpty ? ' ' : line.text,
+                    style: TextStyle(
+                      fontSize: big ? 22 : 18,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LyricsEmpty extends StatelessWidget {
+  final Song song;
+  const _LyricsEmpty({required this.song});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    if (song.lyricsStatus == LyricsStatus.loading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(height: 12),
+            Text('Sözler aranıyor…'),
+          ],
+        ),
+      );
+    }
+    final error = song.lyricsStatus == LyricsStatus.error;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            error
+                ? 'Sözler yüklenemedi.\nBağlantını kontrol edip tekrar dene.'
+                : 'Bu şarkı için söz bulunamadı.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            children: [
+              if (kOnlineLyrics)
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  onPressed: () => c.loadLyricsOnline(song, force: true),
+                  child: Text(error ? 'Tekrar dene' : 'İnternetten ara'),
+                ),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                onPressed: () => pickLyricsFor(context, song),
+                child: const Text('.lrc dosyası ekle'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SyncedLyrics extends StatefulWidget {
+  final Lyrics lyrics;
+  final bool big;
+  const _SyncedLyrics({super.key, required this.lyrics, required this.big});
+
+  @override
+  State<_SyncedLyrics> createState() => _SyncedLyricsState();
+}
+
+class _SyncedLyricsState extends State<_SyncedLyrics> {
+  final c = PlayerController.instance;
+  late final List<GlobalKey> _keys;
+  final ScrollController _scroll = ScrollController();
+  StreamSubscription<Duration>? _sub;
+  int _idx = -1;
+
+  // Satır, zamanından biraz önce vurgulansın (gözün okuması için)
+  static const _lookahead = Duration(milliseconds: 250);
+
+  @override
+  void initState() {
+    super.initState();
+    _keys = List.generate(widget.lyrics.lines.length, (_) => GlobalKey());
+    _idx = widget.lyrics.indexAt(c.player.position + _lookahead);
+    _sub = c.player.positionStream.listen(_onPos);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(jump: true));
+  }
+
+  void _onPos(Duration pos) {
+    final i = widget.lyrics.indexAt(pos + _lookahead);
+    if (i == _idx || !mounted) return;
+    setState(() => _idx = i);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  void _reveal({bool jump = false}) {
+    if (!mounted || _idx < 0 || _idx >= _keys.length) return;
+    final ctx = _keys[_idx].currentContext;
+    if (ctx == null || !_scroll.hasClients) return;
+    final ro = ctx.findRenderObject();
+    if (ro is! RenderBox || !ro.attached) return;
+    // Scrollable.ensureVisible üst sayfayı da kaydırırdı; sadece kendi listemizi kaydırıyoruz
+    final viewport = RenderAbstractViewport.maybeOf(ro);
+    if (viewport == null) return;
+    final target = viewport
+        .getOffsetToReveal(ro, widget.big ? 0.4 : 0.3)
+        .offset
+        .clamp(_scroll.position.minScrollExtent, _scroll.position.maxScrollExtent)
+        .toDouble();
+    if (jump) {
+      _scroll.jumpTo(target);
+    } else {
+      _scroll.animateTo(target,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic);
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = widget.lyrics.lines;
+    return SingleChildScrollView(
+      controller: _scroll,
+      padding: EdgeInsets.only(top: 16, bottom: widget.big ? 200 : 140, right: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < lines.length; i++)
+            GestureDetector(
+              key: _keys[i],
+              behavior: HitTestBehavior.opaque,
+              onTap: () => c.seek(lines[i].time!),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 250),
+                  style: TextStyle(
+                    fontSize: widget.big ? 28 : 22,
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                    color: i == _idx
+                        ? Colors.white
+                        : (i < _idx ? Colors.white38 : Colors.white54),
+                  ),
+                  child: Text(lines[i].text.isEmpty ? '♪' : lines[i].text),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tam ekran söz sayfası: renkli arka plan, büyük yazı, altta ilerleme çubuğu ve kontroller.
+class LyricsPage extends StatelessWidget {
+  const LyricsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final song = c.current;
+        if (song == null) return const Scaffold();
+        return Scaffold(
+          body: AnimatedContainer(
+            duration: const Duration(milliseconds: 500),
+            color: lyricsBg(song.tint),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.keyboard_arrow_down, size: 32),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(song.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                            Text(song.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.white70)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.more_horiz),
+                        onPressed: () => showLyricsMenu(context, song),
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: LyricsView(song: song, big: true),
+                    ),
+                  ),
+                  if (song.lyrics != null)
+                    Text('Sözler: ${song.lyrics!.source}',
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.white60)),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    child: SeekBar(),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        iconSize: 36,
+                        icon: const Icon(Icons.skip_previous),
+                        onPressed: c.previous,
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: const BoxDecoration(
+                            color: Colors.white, shape: BoxShape.circle),
+                        child: IconButton(
+                          iconSize: 36,
+                          color: Colors.black,
+                          icon: Icon(
+                              c.isPlaying ? Icons.pause : Icons.play_arrow),
+                          onPressed: c.togglePlay,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        iconSize: 36,
+                        icon: const Icon(Icons.skip_next),
+                        onPressed: c.next,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
