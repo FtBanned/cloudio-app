@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:path_provider/path_provider.dart';
@@ -44,5 +45,19 @@ Future<void> deleteAudioFile(String? file) async {
     if (p != null) await File(p).delete();
   } catch (e) {
     debugPrint('[Cloudio] fayl silinmədi ($file): $e');
+  }
+}
+
+/// Kilid ekranı üçün kapağı müvəqqəti fayl kimi yazır və onun linkini qaytarır.
+/// [key] eyni olarsa fayl təkrar yazılmır.
+Future<Uri?> writeCoverFile(String key, Uint8List bytes) async {
+  try {
+    final dir = await getTemporaryDirectory();
+    final f = File('${dir.path}/cover_$key.jpg');
+    if (!await f.exists()) await f.writeAsBytes(bytes, flush: true);
+    return f.uri;
+  } catch (e) {
+    debugPrint('[Cloudio] kapaq faylı yazılmadı: $e');
+    return null;
   }
 }

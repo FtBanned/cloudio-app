@@ -2,15 +2,37 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
+import 'package:audio_service/audio_service.dart' show AudioService, AudioServiceConfig;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
+import 'audio_handler.dart';
 import 'cover_lookup.dart' show kOnlineCovers;
 import 'lyrics.dart';
 import 'player_controller.dart';
 import 'queue_page.dart';
 
-void main() => runApp(const CloudioApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Kilid ekranı və arxa planda çalma (yalnız telefonda; web-də söndürülüb).
+  // Xəta olsa tətbiq yenə də açılır, sadəcə kilid ekranı idarəsi olmur.
+  if (!kIsWeb) {
+    try {
+      await AudioService.init(
+        builder: () => CloudioAudioHandler(PlayerController.instance),
+        config: AudioServiceConfig(
+          androidNotificationChannelId: 'com.cloudio.app.audio',
+          androidNotificationChannelName: 'Cloudio',
+        ),
+      );
+    } catch (e, st) {
+      debugPrint('[Cloudio] AudioService başlamadı: $e');
+      debugPrint('$st');
+    }
+  }
+  runApp(const CloudioApp());
+}
 
 const kGreen = Color(0xFF1DB954);
 const kBg = Color(0xFF121212);
