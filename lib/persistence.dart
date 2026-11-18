@@ -60,6 +60,25 @@ class SavedSong {
   });
 }
 
+/// Bir dinləmə hadisəsi (30 san dinlənəndə yazılır). Şəxsi statistika bunun üstündən qurulur.
+/// Mahnı sonradan silinsə də statistika qalsın deyə ad/sənətçi/janr burada da saxlanır.
+class PlayEvent {
+  final int ts; // epoch ms
+  final String songId;
+  final String title;
+  final String artist;
+  final String genre;
+  final int durMs; // 0: bilinmir
+  const PlayEvent({
+    required this.ts,
+    required this.songId,
+    required this.title,
+    required this.artist,
+    this.genre = '',
+    this.durMs = 0,
+  });
+}
+
 class SavedPlaylist {
   final String name;
   final List<String> ids;
@@ -110,6 +129,7 @@ class CloudioStore {
   final _songs = stringMapStoreFactory.store('songs'); // yüngül məlumat + üzlük
   final _audio = stringMapStoreFactory.store('audio'); // səs faylının özü (base64)
   final _meta = stringMapStoreFactory.store('meta'); // çalma siyahıları
+  final _plays = intMapStoreFactory.store('plays'); // dinləmə tarixçəsi (statistika)
 
   Future<void> open() async {
     try {
@@ -457,6 +477,51 @@ class CloudioStore {
     } catch (e) {
       debugPrint('[Cloudio DB] ayarlar oxunmadı: $e');
       return null;
+    }
+  }
+
+  // ---- dinləmə tarixçəsi (Şəxsi statistika) ----
+  Future<void> addPlay(PlayEvent e) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _plays.add(db, <String, Object?>{
+        'ts': e.ts,
+        'id': e.songId,
+        't': e.title,
+        'a': e.artist,
+        'g': e.genre,
+        'd': e.durMs,
+      });
+    } catch (err) {
+      debugPrint('[Cloudio DB] dinləmə yazıla bilmədi: $err');
+    }
+  }
+
+  Future<List<PlayEvent>> loadPlays() async {
+    final db = _db;
+    if (db == null) return const [];
+    try {
+      final snaps = await _plays.find(db);
+      final out = <PlayEvent>[];
+      for (final snap in snaps) {
+        try {
+          final m = snap.value;
+          out.add(PlayEvent(
+            ts: m['ts'] as int? ?? 0,
+            songId: m['id'] as String? ?? '',
+            title: m['t'] as String? ?? '',
+            artist: m['a'] as String? ?? '',
+            genre: m['g'] as String? ?? '',
+            durMs: m['d'] as int? ?? 0,
+          ));
+        } catch (_) {}
+      }
+      out.sort((a, b) => a.ts.compareTo(b.ts));
+      return out;
+    } catch (e) {
+      debugPrint('[Cloudio DB] dinləmə tarixçəsi oxunmadı: $e');
+      return const [];
     }
   }
 

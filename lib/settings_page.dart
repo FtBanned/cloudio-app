@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'main.dart' show kBg, kCard, kGreen, formatTotal, showSleepSheet;
 import 'player_controller.dart';
+import 'stats_page.dart';
 
 /// Ayarlar səhifəsini açır (profil şəkli və Now Playing-dəki "tune" düyməsi bunu çağırır).
 void openSettings(BuildContext context) {
@@ -42,6 +43,16 @@ class SettingsPage extends StatelessWidget {
           children: [
             // ---------- Hesap ----------
             const _ProfileCard(),
+
+            ListTile(
+              leading: const Icon(Icons.insights_outlined, color: kGreen),
+              title: const Text('Şəxsi statistika'),
+              subtitle: const Text(
+                  'Aylıq sənətçilər, dinləmə vaxtı, ən çox dinlənənlər',
+                  style: TextStyle(color: Colors.white54, fontSize: 12)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+              onTap: () => openStats(context),
+            ),
 
             // ---------- Çalma ----------
             const _SectionTitle('Çalma'),
@@ -395,7 +406,18 @@ class _ProfileCard extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              style: TextButton.styleFrom(
+                  foregroundColor: light, padding: EdgeInsets.zero),
+              onPressed: () => openStats(context),
+              icon: const Icon(Icons.insights_outlined, size: 18),
+              label: const Text('Şəxsi statistika'),
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
               'Bu cihazdaki yerel hesap • ${_months[since.month - 1]} ${since.year}'
               ' tarihinden beri',

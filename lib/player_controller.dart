@@ -189,6 +189,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         profileSince = DateTime.now(); // ilk açılış: hesab indi yaradılır
         _saveProfile();
       }
+      playLog
+        ..clear()
+        ..addAll(await CloudioStore.instance.loadPlays());
       final lib = await CloudioStore.instance.loadAll();
       if (lib != null) {
         final byId = <String, Song>{};
@@ -496,6 +499,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         _markedCount = true;
         s.playCount++;
         s.lastPlayedMs = DateTime.now().millisecondsSinceEpoch;
+        _logPlay(s);
         unawaited(_saveSong(s));
         notifyListeners();
       }
@@ -690,6 +694,40 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (m.isEmpty) return null;
     final e = m.entries.reduce((a, b) => a.value >= b.value ? a : b);
     return (e.key, e.value);
+  }
+
+  // ---- Şəxsi statistika ----
+  /// Hər 30 san dinləmə üçün bir yazı (köhnədən yeniyə). Köhnə versiyadan gələn
+  /// dinləmələrin tarixi yoxdur: onlar yalnız "Hamısı" görünüşündəki cəmlərdə sayılır.
+  final List<PlayEvent> playLog = [];
+
+  void _logPlay(Song s) {
+    final e = PlayEvent(
+      ts: s.lastPlayedMs,
+      songId: s.id,
+      title: s.title,
+      artist: s.artist,
+      genre: s.genre,
+      durMs: s.duration?.inMilliseconds ?? 0,
+    );
+    playLog.add(e);
+    unawaited(CloudioStore.instance.addPlay(e));
+  }
+
+  /// [from] ilə [to] arasındakı (to daxil deyil) dinləmələr.
+  List<PlayEvent> playsBetween(DateTime from, [DateTime? to]) {
+    final a = from.millisecondsSinceEpoch;
+    final b = to?.millisecondsSinceEpoch ?? 9007199254740991; // 2^53-1 (web-də də təhlükəsiz)
+    return [
+      for (final e in playLog)
+        if (e.ts >= a && e.ts < b) e,
+    ];
+  }
+
+  /// Tarixçəsi olmayan, köhnə versiyadan qalmış dinləmələrin sayı.
+  int get untrackedPlays {
+    final d = totalPlays - playLog.length;
+    return d > 0 ? d : 0;
   }
 
   // ---- görünüş ----
