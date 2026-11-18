@@ -117,9 +117,15 @@ class Lyrics {
 
 /// Mod'daki (TvMusicOnline) temizleme mantığı: "(Official Video)", "[Lyrics]", "klip" vb. atılır.
 String cleanForSearch(String s) => s
-    .replaceAll(RegExp(r'[\(\[][^\)\]]*[\)\]]'), ' ')
+    .replaceAll('_', ' ')
+    .replaceAll(RegExp(r'[\(\[\{][^\)\]\}]*[\)\]\}]'), ' ')
     .replaceAll(
-        RegExp(r'\b(official|video|music|lyrics?|lyric|audio|hd|hq|4k|klip|sözleri|şarkı sözleri)\b',
+        RegExp(r'(?:https?://)?(?:www\.)?[\w-]+\.(?:com|net|org|az|ru|tr|info|biz|me|tv|fm|co|io|ws|ir)\b',
+            caseSensitive: false),
+        ' ')
+    .replaceFirst(RegExp(r'^\s*\d{1,3}\s*[\.\-–)]\s+'), '')
+    .replaceAll(
+        RegExp(r'\b(official|video|music|lyrics?|lyric|audio|hd|hq|4k|klip|sözleri|şarkı sözleri|mp3|indir|download|yukle)\b',
             caseSensitive: false),
         ' ')
     .replaceAll(RegExp(r'\s+'), ' ')

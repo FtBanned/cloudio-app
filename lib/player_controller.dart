@@ -1,10 +1,12 @@
-import 'dart:async' show Timer, unawaited;
+import 'dart:async' show StreamController, StreamSubscription, Timer, unawaited;
 import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show Color;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart'
+    show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:just_audio/just_audio.dart';
 
 import 'audio_url_stub.dart' if (dart.library.js_interop) 'audio_url_web.dart';
@@ -21,6 +23,9 @@ import 'tag_reader.dart';
 const kOnlineLyrics = !kIsWeb;
 
 const kUnknownArtist = 'Bilinmeyen sanatçı';
+
+/// Kapak/isim arama algoritmasının sürümü: artırılınca "bulunamadı" olanlar yeniden aranır.
+const kCoverSearchVersion = 2;
 
 /// Əlavə oluna bilən səs faylı uzantıları (seçici hamısını göstərir, burada süzülür).
 const kAudioExts = ['mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'opus'];
@@ -46,6 +51,12 @@ class Song {
   bool liked = false; // beğenilenler (yeşil tik)
   Lyrics? lyrics;
   LyricsStatus lyricsStatus;
+  Duration? duration; // etiketten hesaplanır ya da ilk çalınınca öğrenilir
+  bool durationTried = false; // süre bir kez yoxlandı (tapılmasa da)
+  int playCount = 0; // 30 sn dinlenen çalma sayısı
+  int lastPlayedMs = 0; // son çalma anı (epoch ms), 0 = hiç çalınmadı
+  double? gainDb; // ReplayGain etiketi (dB), yoksa null
+  bool gainTried = false; // etiket bir kez arandı
 
   Song({
     required this.id,
@@ -60,6 +71,7 @@ class Song {
     this.bytes,
     required this.ext,
     this.lyrics,
+    this.duration,
   })  : lyricsStatus =
             lyrics != null ? LyricsStatus.found : LyricsStatus.idle,
         coverStatus = cover != null ? CoverStatus.found : CoverStatus.idle;
@@ -73,18 +85,18 @@ class Playlist {
 
 enum RepeatKind { off, all, one }
 
-class PlayerController extends ChangeNotifier {
+class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   PlayerController._() {
-    player.playerStateStream.listen((_) => notifyListeners());
-    player.processingStateStream.listen((state) {
-      if (state == ProcessingState.completed) _onCompleted();
-    });
+    WidgetsBinding.instance.addObserver(this);
+    _bind(player);
     unawaited(_restore()); // əvvəl saxlanmış kitabxananı yüklə
   }
 
   static final PlayerController instance = PlayerController._();
 
-  final AudioPlayer player = AudioPlayer();
+  /// Aktiv pleyer. Crossfade zamanı ikinci pleyerlə yer dəyişir, ona görə final deyil.
+  AudioPlayer player = AudioPlayer();
+  AudioPlayer? _spare; // crossfade üçün ikinci pleyer (lazım olanda yaradılır)
   final List<Song> songs = []; // kitaplık (tüm şarkılar)
   final List<Playlist> playlists = [];
   final Random _rng = Random();
@@ -108,6 +120,12 @@ class PlayerController extends ChangeNotifier {
     try {
       await initLocalFiles();
       await CloudioStore.instance.open();
+      final st = await CloudioStore.instance.loadSettings();
+      if (st != null) {
+        crossfadeSecs = kIsWeb ? 0 : st.crossfade;
+        normalizeOn = st.normalize;
+        _coverVersion = st.coverVersion;
+      }
       final lib = await CloudioStore.instance.loadAll();
       if (lib != null) {
         final byId = <String, Song>{};
@@ -128,6 +146,15 @@ class PlayerController extends ChangeNotifier {
             path: audioPathFor(r.file),
           );
           s.liked = r.liked;
+          s.playCount = r.playCount;
+          s.lastPlayedMs = r.lastPlayedMs;
+          s.gainDb = r.gainDb;
+          s.gainTried = r.gainTried;
+          final dm = r.durationMs;
+          if (dm != null) {
+            s.durationTried = true;
+            if (dm > 0) s.duration = Duration(milliseconds: dm);
+          }
           if (cover == null && r.coverStatus == CoverStatus.none.index) {
             s.coverStatus = CoverStatus.none;
           }
@@ -146,6 +173,18 @@ class PlayerController extends ChangeNotifier {
           playlists.add(pl);
         }
         _seq = songs.fold<int>(0, (m, s) => max(m, s.seq));
+        // Arama algoritması yenilendi: eskiden "bulunamadı" işaretlenenler yeniden denensin
+        if (_coverVersion < kCoverSearchVersion) {
+          for (final s in songs) {
+            if (s.cover == null && s.coverStatus == CoverStatus.none) {
+              s.coverStatus = CoverStatus.idle;
+              unawaited(_saveSong(s));
+            }
+          }
+          _coverVersion = kCoverSearchVersion;
+          _saveSettings();
+        }
+        await _restorePlayback(byId);
       }
     } catch (e, st) {
       debugPrint('Kitabxana bərpa olunmadı: $e');
@@ -154,7 +193,57 @@ class PlayerController extends ChangeNotifier {
     loading = false;
     restored = true;
     notifyListeners();
+    unawaited(_backfillDurations()); // süresi bilinməyən köhnə mahnılar üçün (bir dəfə)
+    if (normalizeOn) unawaited(_backfillGains());
     unawaited(refreshCovers()); // üzlüyü olmayanlar üçün axtarışa davam
+  }
+
+  // ---- aktiv pleyerin axınları sabit axınlara yönləndirilir ----
+  final _stateCtl = StreamController<void>.broadcast();
+  final _durCtl = StreamController<Duration?>.broadcast();
+  final _posCtl = StreamController<Duration>.broadcast();
+  final List<StreamSubscription<dynamic>> _subs = [];
+
+  /// Oynatma vəziyyəti dəyişəndə (kilid ekranı üçün).
+  Stream<void> get stateTick => _stateCtl.stream;
+  Stream<Duration?> get durationTick => _durCtl.stream;
+
+  /// Hazırkı mövqe ilə başlayır, sonra aktiv pleyerin mövqeyini ötürür.
+  Stream<Duration> get positionStream async* {
+    yield player.position;
+    yield* _posCtl.stream;
+  }
+
+  void _bind(AudioPlayer p) {
+    for (final sub in _subs) {
+      sub.cancel();
+    }
+    _subs
+      ..clear()
+      ..addAll([
+        p.playerStateStream.listen((_) {
+          // pauza: mövqeyi dərhal saxla (mahnı yüklənərkən köhnə mövqe yazılmasın)
+          if (!_fading &&
+              !p.playing &&
+              p.processingState == ProcessingState.ready) {
+            _crossTimer?.cancel();
+            _crossTimer = null;
+            _savePositionNow();
+          }
+          notifyListeners();
+          _stateCtl.add(null);
+        }),
+        p.playbackEventStream.listen((_) => _stateCtl.add(null),
+            onError: (Object e) => debugPrint('Pleyer xətası: $e')),
+        p.processingStateStream.listen((state) {
+          if (state == ProcessingState.completed) _onCompleted();
+        }),
+        p.positionStream.listen((pos) {
+          _onPosition(pos);
+          _posCtl.add(pos);
+        }),
+        p.durationStream.listen(_durCtl.add),
+      ]);
   }
 
   Future<bool> _saveSong(Song s, {bool withAudio = false}) {
@@ -171,6 +260,13 @@ class PlayerController extends ChangeNotifier {
       lyrics: s.lyrics,
       lyricsNotFound: s.lyricsStatus == LyricsStatus.notFound,
       file: s.file,
+      durationMs: s.duration != null
+          ? s.duration!.inMilliseconds
+          : (s.durationTried ? -1 : null),
+      playCount: s.playCount,
+      lastPlayedMs: s.lastPlayedMs,
+      gainDb: s.gainDb,
+      gainTried: s.gainTried,
       audio: withAudio ? s.bytes : null,
     );
   }
@@ -180,6 +276,369 @@ class PlayerController extends ChangeNotifier {
       for (final p in playlists)
         SavedPlaylist(p.name, [for (final s in p.songs) s.id]),
     ]));
+  }
+
+  // ---- son çalma vəziyyəti (mahnı, növbə sırası, mövqe) ----
+  int _lastPosSave = 0;
+
+  void _saveQueueState() {
+    unawaited(CloudioStore.instance.saveQueue(SavedQueue(
+      ids: [for (final s in _queue) s.id],
+      order: List.of(_order),
+      cur: currentIndex,
+      pos: _pos,
+      shuffle: shuffleOn,
+      repeat: repeatKind.index,
+      name: queueName,
+    )));
+  }
+
+  /// Hazırkı mahnının çalma mövqeyini saxlayır. Yeni mahnı hələ yüklənməyibsə
+  /// (_markSong null) heç nə yazmır ki, səhv mövqe yazılmasın.
+  void _savePositionNow([Duration? pos]) {
+    final s = _markSong;
+    if (s == null || !identical(s, current)) return;
+    _lastPosSave = DateTime.now().millisecondsSinceEpoch;
+    unawaited(CloudioStore.instance
+        .savePosition(s.id, (pos ?? player.position).inMilliseconds));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _savePositionNow();
+  }
+
+  /// Tətbiq açılanda son mahnını, növbəni və mövqeyi pauzada hazırlayır.
+  Future<void> _restorePlayback(Map<String, Song> byId) async {
+    try {
+      final q = await CloudioStore.instance.loadQueue();
+      if (q == null) return;
+      final c = q.cur;
+      if (c == null || c < 0 || c >= q.ids.length) return;
+      final curSong = byId[q.ids[c]];
+      if (curSong == null) return;
+      if (!kIsWeb && curSong.path == null) return; // fayl yoxdur
+
+      final queue = <Song>[
+        for (final id in q.ids)
+          if (byId[id] != null) byId[id]!,
+      ];
+      final newCur = queue.indexOf(curSong);
+      if (newCur < 0) return;
+
+      _queue = queue;
+      queueName = q.name.isEmpty ? 'Tüm Şarkılar' : q.name;
+      shuffleOn = q.shuffle;
+      repeatKind = RepeatKind.values[q.repeat.clamp(0, 2)];
+      if (shuffleOn) {
+        final okOrder = queue.length == q.ids.length &&
+            q.order.length == queue.length &&
+            q.order.toSet().length == queue.length &&
+            q.order.every((i) => i >= 0 && i < queue.length) &&
+            q.pos >= 0 &&
+            q.pos < q.order.length &&
+            q.order[q.pos] == newCur;
+        if (okOrder) {
+          _order = List.of(q.order);
+          _pos = q.pos;
+        } else {
+          _buildShuffle(first: newCur);
+        }
+      }
+
+      final p = await CloudioStore.instance.loadPosition();
+      var start = Duration.zero;
+      if (p != null && p.id == curSong.id && p.ms > 0) {
+        start = Duration(milliseconds: p.ms);
+        final d = curSong.duration;
+        if (d != null && start >= d - const Duration(seconds: 1)) {
+          start = Duration.zero;
+        }
+      }
+      await _playIndex(newCur, autoPlay: false, startAt: start);
+    } catch (e, st) {
+      debugPrint('Son çalma vəziyyəti bərpa olunmadı: $e');
+      debugPrint('$st');
+    }
+  }
+
+  // ---- dinləmə statistikası (Son çaldıkların / En çok dinlediklerin) ----
+  Song? _markSong; // yüklənib çalmağa başlayan mahnı
+  bool _markedRecent = false;
+  bool _markedCount = false;
+
+  /// Son çalınanlar (yenidən köhnəyə), en çok 20.
+  List<Song> get recentSongs {
+    final l = songs.where((s) => s.lastPlayedMs > 0).toList()
+      ..sort((a, b) => b.lastPlayedMs.compareTo(a.lastPlayedMs));
+    return l.length > 20 ? l.sublist(0, 20) : l;
+  }
+
+  /// En çok dinlenenler (çalma sayısına göre), en çok 10.
+  List<Song> get topSongs {
+    final l = songs.where((s) => s.playCount > 0).toList()
+      ..sort((a, b) {
+        final c = b.playCount.compareTo(a.playCount);
+        return c != 0 ? c : b.lastPlayedMs.compareTo(a.lastPlayedMs);
+      });
+    return l.length > 10 ? l.sublist(0, 10) : l;
+  }
+
+  void _onPosition(Duration pos) {
+    final s = _markSong;
+    if (s == null || !player.playing) return;
+    if (player.processingState != ProcessingState.ready) return;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastPosSave >= 3000) _savePositionNow(pos);
+    _crossfadeTick(pos);
+    if (!_markedRecent && pos >= const Duration(seconds: 5)) {
+      _markedRecent = true;
+      s.lastPlayedMs = DateTime.now().millisecondsSinceEpoch;
+      unawaited(_saveSong(s));
+      notifyListeners();
+    }
+    if (!_markedCount) {
+      var need = const Duration(seconds: 30);
+      final dur = s.duration ?? player.duration;
+      if (dur != null && dur < const Duration(seconds: 60)) need = dur ~/ 2;
+      if (pos >= need) {
+        _markedCount = true;
+        s.playCount++;
+        s.lastPlayedMs = DateTime.now().millisecondsSinceEpoch;
+        unawaited(_saveSong(s));
+        notifyListeners();
+      }
+    }
+  }
+
+  // ---- süre: köhnə mahnılar üçün arxa planda bir dəfə hesablanır ----
+  bool _backfillRunning = false;
+
+  Future<void> _backfillDurations() async {
+    if (_backfillRunning) return;
+    _backfillRunning = true;
+    try {
+      final todo = songs.where((s) => !s.durationTried).toList();
+      for (final s in todo) {
+        if (!songs.contains(s)) continue;
+        Uint8List? data;
+        try {
+          data = kIsWeb
+              ? await CloudioStore.instance.loadAudio(s.id)
+              : await readAudioBytes(s.path);
+        } catch (_) {}
+        if (data != null) s.duration ??= readDuration(data, s.ext);
+        s.durationTried = true;
+        await _saveSong(s);
+        notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 20)); // UI donmasın
+      }
+    } finally {
+      _backfillRunning = false;
+    }
+  }
+
+  // ---- ses seviyəsi tarazlama (ReplayGain etiketi → səs yüksəkliyi) ----
+  bool normalizeOn = false;
+  double _baseVolume = 1.0; // hazırkı mahnının tarazlama səsi (0..1)
+  bool _gainRunning = false;
+
+  int get gainTaggedCount => songs.where((s) => s.gainDb != null).length;
+
+  /// iOS səsi yalnız azalda bilir (maks. 1.0). Hədəf: etiket dB + 6 (müasir mahnılar üçün
+  /// ~ -12 LUFS); +6 dB-dən çox artırma tələb edən sakit mahnılar olduğu kimi qalır.
+  double _gainFor(Song s) {
+    final g = s.gainDb;
+    if (!normalizeOn || g == null) return 1.0;
+    final db = min(0.0, g + 6.0);
+    return pow(10, db / 20).toDouble().clamp(0.05, 1.0);
+  }
+
+  void _applyBaseVolume() {
+    final cur = current;
+    _baseVolume = cur == null ? 1.0 : _gainFor(cur);
+    if (!_fading && _fadeTimerSleep == null) {
+      unawaited(player.setVolume(_baseVolume));
+    }
+  }
+
+  Future<void> setNormalize(bool on) async {
+    normalizeOn = on;
+    _applyBaseVolume();
+    _saveSettings();
+    notifyListeners();
+    if (on) unawaited(_backfillGains());
+  }
+
+  /// Etiketi hələ yoxlanmamış (köhnə) mahnılar üçün fayldan oxuyur (bir dəfə).
+  Future<void> _backfillGains() async {
+    if (_gainRunning) return;
+    _gainRunning = true;
+    try {
+      for (final s in songs.where((s) => !s.gainTried).toList()) {
+        if (!songs.contains(s)) continue;
+        Uint8List? data;
+        try {
+          data = kIsWeb
+              ? await CloudioStore.instance.loadAudio(s.id)
+              : await readAudioBytes(s.path);
+        } catch (_) {}
+        if (data != null) s.gainDb = readReplayGain(data, s.ext);
+        s.gainTried = true;
+        await _saveSong(s);
+        if (identical(s, current)) _applyBaseVolume();
+        notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 20));
+      }
+    } finally {
+      _gainRunning = false;
+    }
+  }
+
+  int _coverVersion = 0;
+
+  void _saveSettings() => unawaited(CloudioStore.instance.saveSettings(
+      crossfade: crossfadeSecs,
+      normalize: normalizeOn,
+      coverVersion: _coverVersion));
+
+  // ---- crossfade / boşluksuz keçid ----
+  // İkinci pleyer sıradakı mahnını əvvəlcədən yükləyir; sonda iki pleyerin səsi
+  // bərabər-güc əyrisi ilə dəyişir və rollar yer dəyişir.
+  double crossfadeSecs = 0; // 0 = kapalı, 0.25 = boşluksuz, 3..12 saniyə
+  bool get crossfadeSupported => !kIsWeb;
+
+  bool _fading = false;
+  Timer? _fadeRamp; // səs əyrisi taymeri
+  Timer? _crossTimer; // keçidin başlama anını dəqiq tutur
+  AudioPlayer? _fadeOld; // səsi azalan köhnə pleyer
+  Song? _preSong; // ikinci pleyerdə hazır gözləyən mahnı
+  bool _preloading = false;
+
+  void setCrossfade(double secs) {
+    crossfadeSecs = kIsWeb ? 0 : secs;
+    _crossTimer?.cancel();
+    _crossTimer = null;
+    _saveSettings();
+    notifyListeners();
+  }
+
+  /// Avtomatik keçiddə sıradakı mahnının indeksi (yoxdursa null).
+  /// Qarışıq sıranın sonu / hamısını təkrarla halı adi keçidə buraxılır.
+  int? _peekNextIndex() {
+    final cur = currentIndex;
+    if (cur == null || _queue.length < 2) return null;
+    if (_shuffleActive) {
+      if (_order.length != _queue.length) return null;
+      return _pos + 1 < _order.length ? _order[_pos + 1] : null;
+    }
+    if (cur + 1 < _queue.length) return cur + 1;
+    return repeatKind == RepeatKind.all ? 0 : null;
+  }
+
+  bool get _crossfadeAllowed =>
+      crossfadeSecs > 0 &&
+      crossfadeSupported &&
+      repeatKind != RepeatKind.one &&
+      !sleepAtSongEnd &&
+      !_fading;
+
+  void _crossfadeTick(Duration pos) {
+    if (!_crossfadeAllowed || _crossTimer != null) return;
+    final dur = player.duration;
+    if (dur == null) return;
+    final fadeMs = (crossfadeSecs * 1000).round();
+    if (dur.inMilliseconds < fadeMs * 2 + 2000) return; // çox qısa mahnı
+    final rem = (dur - pos).inMilliseconds;
+    final idx = _peekNextIndex();
+    if (idx == null) return;
+    final next = _queue[idx];
+    if (rem <= fadeMs + 10000 && !identical(_preSong, next)) {
+      unawaited(_preload(next));
+    }
+    if (rem <= fadeMs + 1000 && identical(_preSong, next)) {
+      _crossTimer = Timer(Duration(milliseconds: max(0, rem - fadeMs)), () {
+        _crossTimer = null;
+        unawaited(_doCrossfade(fadeMs));
+      });
+    }
+  }
+
+  Future<void> _preload(Song s) async {
+    final path = s.path;
+    if (_preloading || path == null) return;
+    _preloading = true;
+    try {
+      final sp = _spare ??= AudioPlayer();
+      await sp.setVolume(0);
+      await sp.setFilePath(path);
+      _preSong = s;
+    } catch (e) {
+      _preSong = null;
+      debugPrint('Sıradakı mahnı hazırlanmadı (${s.title}): $e');
+    }
+    _preloading = false;
+  }
+
+  Future<void> _doCrossfade(int fadeMs) async {
+    if (!_crossfadeAllowed || !player.playing) return;
+    final idx = _peekNextIndex();
+    final sp = _spare;
+    if (idx == null || sp == null) return;
+    final next = _queue[idx];
+    if (!identical(_preSong, next)) return;
+
+    final old = player;
+    final gOld = _baseVolume;
+    final gNew = _gainFor(next);
+    _fading = true;
+    _fadeOld = old;
+    _playToken++; // gözləyən əl ilə keçidlər ləğv olsun
+
+    // rollar yer dəyişir: yeni mahnı artıq aktivdir (UI, söz, mövqe ona keçir)
+    player = sp;
+    _spare = old;
+    _preSong = null;
+    _bind(player);
+    if (_shuffleActive) _pos++;
+    currentIndex = idx;
+    _baseVolume = gNew;
+    _markSong = next;
+    _markedRecent = false;
+    _markedCount = false;
+    _saveQueueState();
+    _savePositionNow(Duration.zero);
+    notifyListeners();
+
+    unawaited(sp.play());
+    final sw = Stopwatch()..start();
+    _fadeRamp = Timer.periodic(const Duration(milliseconds: 60), (t) {
+      final x = (sw.elapsedMilliseconds / fadeMs).clamp(0.0, 1.0).toDouble();
+      unawaited(sp.setVolume(gNew * sin(x * pi / 2)));
+      unawaited(old.setVolume(gOld * cos(x * pi / 2)));
+      if (x >= 1) {
+        t.cancel();
+        _fadeRamp = null;
+        _fading = false;
+        _fadeOld = null;
+        unawaited(old.pause());
+        unawaited(sp.setVolume(_baseVolume));
+      }
+    });
+  }
+
+  /// Keçidi (və ya gözləyən taymeri) dayandırır: köhnə pleyer susur, yeni pleyer tam səsə qayıdır.
+  void _cancelFade() {
+    _crossTimer?.cancel();
+    _crossTimer = null;
+    if (!_fading) return;
+    _fadeRamp?.cancel();
+    _fadeRamp = null;
+    _fading = false;
+    final old = _fadeOld;
+    _fadeOld = null;
+    if (old != null) unawaited(old.pause());
+    unawaited(player.setVolume(_baseVolume));
   }
 
   Song? get current {
@@ -275,6 +734,54 @@ class PlayerController extends ChangeNotifier {
     }
     _coversCancel = false;
     notifyListeners();
+  }
+
+  // ---- şarkı bilgisini elle düzenleme ----
+
+  /// Başlık, sanatçı, albüm ve (istenirse) kapağı günceller.
+  /// [coverChanged] true ise [cover] yeni kapaktır (null = kapağı kaldır).
+  Future<void> updateSongInfo(
+    Song s, {
+    required String title,
+    required String artist,
+    required String album,
+    Uint8List? cover,
+    bool coverChanged = false,
+  }) async {
+    final t = title.trim();
+    if (t.isNotEmpty) s.title = t;
+    final a = artist.trim();
+    s.artist = a.isEmpty ? kUnknownArtist : a;
+    s.album = album.trim();
+    if (coverChanged) {
+      s.cover = cover;
+      s.tint = cover == null ? null : await coverTint(cover);
+      // kaldırılan kapak otomatik aramayla geri gelmesin
+      s.coverStatus = cover == null ? CoverStatus.none : CoverStatus.found;
+    }
+    unawaited(_saveSong(s));
+    notifyListeners();
+  }
+
+  /// Galeri / dosyadan kapak seçtirir. null: vazgeçildi. Okunamayan resim için istisna fırlatır.
+  Future<Uint8List?> pickCoverImage() async {
+    final files = await FilePicker.pickFiles(type: FileType.image);
+    if (files.isEmpty) return null;
+    final bytes = await files.first.readAsBytes();
+    final out = await normalizeCover(bytes);
+    if (out == null) throw const FormatException('Resim okunamadı');
+    return out;
+  }
+
+  /// Girilen bilgilerle internette kapak arar (kaydetmez, sadece önizleme için döner).
+  Future<Uint8List?> searchCoverOnline(
+      {required String title, required String artist, required String album}) async {
+    final hit = await findCover(
+      title: title.trim(),
+      artist: artist.trim() == kUnknownArtist ? '' : artist.trim(),
+      album: album.trim(),
+    );
+    return hit?.bytes;
   }
 
   // ---- şarkı sözleri ----
@@ -418,6 +925,7 @@ class PlayerController extends ChangeNotifier {
       currentIndex = cur == null ? null : _queue.indexOf(cur);
     }
     if (shuffleOn) _buildShuffle(first: currentIndex);
+    _saveQueueState();
     notifyListeners();
   }
 
@@ -441,14 +949,10 @@ class PlayerController extends ChangeNotifier {
         final ext = dot > 0 ? f.name.substring(dot + 1).toLowerCase() : '';
         final fileTitle = dot > 0 ? f.name.substring(0, dot) : f.name;
 
-        // "Sanatçı - Şarkı" biçimindeki dosya adı (etiket yoksa yedek)
-        var nameArtist = '';
-        var nameTitle = fileTitle;
-        final dash = fileTitle.indexOf(' - ');
-        if (dash > 0) {
-          nameArtist = fileTitle.substring(0, dash).trim();
-          nameTitle = fileTitle.substring(dash + 3).trim();
-        }
+        // "Sanatçı - Şarkı" biçimindeki dosya adı (etiket yoksa yedek); çöp temizlenir
+        final parsed = parseFileName(fileTitle);
+        final nameArtist = parsed.artist;
+        final nameTitle = parsed.title.isEmpty ? fileTitle : parsed.title;
 
         final seq = ++_seq;
         // Telefonda: müvəqqəti faylı tətbiqin qovluğuna köçür ki, tətbiq bağlanıb açılanda qalsın
@@ -463,6 +967,8 @@ class PlayerController extends ChangeNotifier {
         final tags = readTags(bytes, ext);
         final cover = tags.cover;
         final tint = cover == null ? null : await coverTint(cover);
+        final dur = readDuration(bytes, ext);
+        final gain = readReplayGain(bytes, ext);
 
         final song = Song(
           id: id,
@@ -481,7 +987,11 @@ class PlayerController extends ChangeNotifier {
           path: localPath,
           file: localFile,
           bytes: kIsWeb ? bytes : null,
-        );
+          duration: dur,
+        )
+          ..durationTried = true
+          ..gainDb = gain
+          ..gainTried = true;
         songs.add(song);
         final saved = await _saveSong(song, withAudio: true);
         // Baza yazdısa səs faylını yaddaşda saxlamırıq: çalanda bazadan oxunacaq
@@ -523,12 +1033,17 @@ class PlayerController extends ChangeNotifier {
 
   int _playToken = 0; // art arda gelen sonraki/önceki isteklerinde eskisini iptal eder
 
-  Future<void> _playIndex(int index) async {
+  Future<void> _playIndex(int index,
+      {bool autoPlay = true, Duration? startAt}) async {
     currentIndex = index;
     final s = _queue[index];
+    _saveQueueState();
     notifyListeners();
 
+    _cancelFade();
+    Duration? loadedDur;
     final token = ++_playToken;
+    _markSong = null; // yeni mahnı yüklənənə qədər sayma
     try {
       // iOS: player.stop() ses oturumunu kapatıyor; arka planda/kilit ekranında
       // oturum bir daha açılamıyor ve sonraki şarkı çalmıyordu. Bu yüzden
@@ -544,7 +1059,7 @@ class PlayerController extends ChangeNotifier {
         final oldUrl = _currentBlobUrl;
         final url = createAudioUrl(data, _mime(s.ext));
         _currentBlobUrl = url;
-        await player.setUrl(url);
+        loadedDur = await player.setUrl(url, initialPosition: startAt);
         if (oldUrl != null) revokeAudioUrl(oldUrl);
       } else {
         final path = s.path;
@@ -552,10 +1067,24 @@ class PlayerController extends ChangeNotifier {
           debugPrint('Fayl tapılmadı: ${s.title}');
           return;
         }
-        await player.setFilePath(path);
+        loadedDur = await player.setFilePath(path, initialPosition: startAt);
       }
       if (token != _playToken) return; // bu arada başka şarkıya geçildi
-      unawaited(player.play());
+      // Süre etiketten bulunamadıysa, yüklenen dosyadan öğren ve sakla
+      if (s.duration == null && loadedDur != null && loadedDur > Duration.zero) {
+        s.duration = loadedDur;
+        s.durationTried = true;
+        unawaited(_saveSong(s));
+        notifyListeners();
+      }
+      _markSong = s;
+      _baseVolume = _gainFor(s);
+      await player.setVolume(_baseVolume);
+      final resumed = startAt ?? Duration.zero;
+      _markedRecent = resumed >= const Duration(seconds: 5); // davam: təkrar sayılmasın
+      _markedCount = resumed >= const Duration(seconds: 30);
+      _savePositionNow(resumed);
+      if (autoPlay) unawaited(player.play());
     } catch (e, st) {
       // Hata olursa Hata Ayıklama Konsolu'nda görünür
       debugPrint('Şarkı çalınamadı (${s.title}): $e');
@@ -565,22 +1094,35 @@ class PlayerController extends ChangeNotifier {
 
   void togglePlay() {
     if (player.playing) {
-      player.pause();
+      unawaited(pause());
     } else {
-      player.play();
+      play();
     }
   }
 
-  Future<void> seek(Duration position) => player.seek(position);
+  void play() => unawaited(player.play());
+
+  Future<void> pause() async {
+    _cancelFade();
+    await player.pause();
+  }
+
+  Future<void> seek(Duration position) async {
+    _cancelFade();
+    await player.seek(position);
+    _savePositionNow(position);
+  }
 
   void toggleShuffle() {
     shuffleOn = !shuffleOn;
     if (shuffleOn) _buildShuffle(first: currentIndex); // çalan mahnı sıranın əvvəlində qalır
+    _saveQueueState();
     notifyListeners();
   }
 
   void cycleRepeat() {
     repeatKind = RepeatKind.values[(repeatKind.index + 1) % 3];
+    _saveQueueState();
     notifyListeners();
   }
 
@@ -619,6 +1161,8 @@ class PlayerController extends ChangeNotifier {
     for (final p in playlists) {
       if (_sameList(ctx, p.songs)) return p.name;
     }
+    if (_sameList(ctx, recentSongs)) return 'Son çaldıkların';
+    if (_sameList(ctx, topSongs)) return 'En çok dinlediklerin';
     // Albom / sənətçi səhifəsindən çalınıbsa onun adı
     if (ctx.isNotEmpty) {
       final al = ctx.first.album.trim();
@@ -673,6 +1217,7 @@ class PlayerController extends ChangeNotifier {
       final v = _queue.removeAt(base + oldI);
       _queue.insert(base + newI, v);
     }
+    _saveQueueState();
     notifyListeners();
   }
 
@@ -694,6 +1239,7 @@ class PlayerController extends ChangeNotifier {
       if (k >= _queue.length) return;
       _queue.removeAt(k);
     }
+    _saveQueueState();
     notifyListeners();
   }
 
@@ -758,6 +1304,7 @@ class PlayerController extends ChangeNotifier {
   // ---- yuxu taymeri ----
   Timer? _sleepTimer;
   Timer? _fadeTimer;
+  Timer? get _fadeTimerSleep => _fadeTimer;
   DateTime? sleepEndsAt; // dəqiqələrlə taymer bitəcək an (yoxdursa null)
   bool sleepAtSongEnd = false; // "mahnı bitəndə dayan"
 
@@ -772,7 +1319,7 @@ class PlayerController extends ChangeNotifier {
     if (_fadeTimer != null) {
       _fadeTimer!.cancel();
       _fadeTimer = null;
-      unawaited(player.setVolume(1.0));
+      unawaited(player.setVolume(_baseVolume));
     }
   }
 
@@ -808,10 +1355,10 @@ class PlayerController extends ChangeNotifier {
       if (step >= steps) {
         t.cancel();
         _fadeTimer = null;
-        await player.pause();
-        await player.setVolume(1.0);
+        await pause();
+        await player.setVolume(_baseVolume);
       } else {
-        await player.setVolume(1.0 - step / steps);
+        await player.setVolume(_baseVolume * (1.0 - step / steps));
       }
     });
   }
@@ -825,6 +1372,8 @@ class PlayerController extends ChangeNotifier {
       return;
     }
     if (repeatKind == RepeatKind.one) {
+      _markedRecent = false; // tək mahnı təkrarı: hər dövr ayrıca sayılsın
+      _markedCount = false;
       await player.seek(Duration.zero);
       player.play();
       return;

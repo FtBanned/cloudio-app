@@ -15,3 +15,6 @@ Future<void> deleteAudioFile(String? file) async {}
 
 /// Web-də kilid ekranı yoxdur.
 Future<Uri?> writeCoverFile(String key, Uint8List bytes) async => null;
+
+/// Web'de ses bazadan okunur; burada kullanılmaz.
+Future<Uint8List?> readAudioBytes(String? path) async => null;

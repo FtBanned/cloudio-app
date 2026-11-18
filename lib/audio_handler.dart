@@ -11,9 +11,9 @@ import 'player_controller.dart';
 /// kilid ekranından gələn əmrlər sadəcə ora ötürülür.
 class CloudioAudioHandler extends BaseAudioHandler {
   CloudioAudioHandler(this._c) {
-    _c.player.playbackEventStream.listen((_) => _broadcast());
-    _c.player.playerStateStream.listen((_) => _broadcast());
-    _c.player.durationStream.listen((_) {
+    // Controller-in sabit axınları: crossfade zamanı aktiv pleyer dəyişsə də qırılmır
+    _c.stateTick.listen((_) => _broadcast());
+    _c.durationTick.listen((_) {
       final s = _c.current;
       if (s != null) unawaited(_publishItem(s));
     });
@@ -26,14 +26,14 @@ class CloudioAudioHandler extends BaseAudioHandler {
   // ---- kilid ekranındakı düymələr ----
   @override
   Future<void> play() async {
-    unawaited(_c.player.play());
+    _c.play();
   }
 
   @override
-  Future<void> pause() => _c.player.pause();
+  Future<void> pause() => _c.pause();
 
   @override
-  Future<void> stop() => _c.player.pause();
+  Future<void> stop() => _c.pause();
 
   @override
   Future<void> seek(Duration position) => _c.seek(position);
@@ -76,6 +76,7 @@ class CloudioAudioHandler extends BaseAudioHandler {
   int _coverLen = -1;
   String _title = '';
   String _artist = '';
+  String _album = '';
 
   void _onController() {
     final s = _c.current;
@@ -90,13 +91,15 @@ class CloudioAudioHandler extends BaseAudioHandler {
     if (identical(s, _song) &&
         coverLen == _coverLen &&
         s.title == _title &&
-        s.artist == _artist) {
+        s.artist == _artist &&
+        s.album == _album) {
       return; // dəyişiklik yoxdur
     }
     _song = s;
     _coverLen = coverLen;
     _title = s.title;
     _artist = s.artist;
+    _album = s.album;
     unawaited(_publishItem(s));
   }
 

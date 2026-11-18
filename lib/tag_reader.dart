@@ -506,3 +506,231 @@ TagInfo _readMp4(Uint8List d) {
     lyrics: lyrics,
   );
 }
+
+
+// ---------------------------------------------------------------- süre
+
+/// Dosya baytlarından şarkı süresini hesaplar (etiket/başlıktan; çalmaya gerek yok).
+/// MP3: Xing/Info/VBRI başlığı, yoksa sabit bitrate; FLAC: STREAMINFO; M4A: mvhd.
+/// Bulunamazsa null (OGG/Opus/WAV vb.: şarkı ilk çalınınca öğrenilir).
+Duration? readDuration(Uint8List data, String ext) {
+  try {
+    Duration? d;
+    switch (ext.toLowerCase()) {
+      case 'mp3':
+        d = _mp3Duration(data);
+        break;
+      case 'flac':
+        d = _flacDuration(data);
+        break;
+      case 'm4a':
+      case 'mp4':
+      case 'm4b':
+        d = _mp4Duration(data);
+        break;
+    }
+    if (d != null && d.inMilliseconds > 0) return d;
+  } catch (_) {
+    // bozuk dosya: süre bilinmiyor
+  }
+  return null;
+}
+
+const _mp3Br1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+const _mp3Br2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+const _mp3Sr = {
+  3: [44100, 48000, 32000], // MPEG1
+  2: [22050, 24000, 16000], // MPEG2
+  0: [11025, 12000, 8000], // MPEG2.5
+};
+
+class _Mp3Frame {
+  final bool mpeg1;
+  final bool mono;
+  final bool crc; // CRC korumalı mı
+  final int bitrate; // kbps
+  final int sampleRate;
+  final int frameLen;
+  const _Mp3Frame(
+      this.mpeg1, this.mono, this.crc, this.bitrate, this.sampleRate, this.frameLen);
+  int get samples => mpeg1 ? 1152 : 576;
+}
+
+/// [i] konumunda geçerli bir MPEG Layer III kare başlığı varsa onu döndürür.
+_Mp3Frame? _mp3Frame(Uint8List d, int i) {
+  if (i + 4 > d.length) return null;
+  if (d[i] != 0xFF || (d[i + 1] & 0xE0) != 0xE0) return null;
+  final ver = (d[i + 1] >> 3) & 3;
+  final layer = (d[i + 1] >> 1) & 3;
+  if (ver == 1 || layer != 1) return null; // yalnızca Layer III
+  final brIdx = d[i + 2] >> 4;
+  final srIdx = (d[i + 2] >> 2) & 3;
+  if (brIdx == 0 || brIdx == 15 || srIdx == 3) return null;
+  final mpeg1 = ver == 3;
+  final br = (mpeg1 ? _mp3Br1 : _mp3Br2)[brIdx];
+  final sr = _mp3Sr[ver]![srIdx];
+  final pad = (d[i + 2] >> 1) & 1;
+  final spf = mpeg1 ? 1152 : 576;
+  final len = ((spf ~/ 8) * br * 1000) ~/ sr + pad;
+  final mono = ((d[i + 3] >> 6) & 3) == 3;
+  final crc = (d[i + 1] & 1) == 0;
+  return _Mp3Frame(mpeg1, mono, crc, br, sr, len);
+}
+
+bool _tagAt(Uint8List d, int o, String t) {
+  if (o < 0 || o + t.length > d.length) return false;
+  for (var k = 0; k < t.length; k++) {
+    if (d[o + k] != t.codeUnitAt(k)) return false;
+  }
+  return true;
+}
+
+Duration? _mp3Duration(Uint8List d) {
+  var p = 0;
+  if (d.length > 10 && _tagAt(d, 0, 'ID3')) {
+    p = 10 + _syncsafe(d, 6) + ((d[5] & 0x10) != 0 ? 10 : 0);
+  }
+  final limit = (p + 65536 < d.length - 4) ? p + 65536 : d.length - 4;
+  for (var i = p; i < limit; i++) {
+    final f = _mp3Frame(d, i);
+    if (f == null) continue;
+    // yanlış senkronu elemek için bir sonraki kare de geçerli olmalı
+    final next = i + f.frameLen;
+    if (next + 4 <= d.length && _mp3Frame(d, next) == null) continue;
+
+    // Xing / Info (VBR) başlığı
+    final side = f.mpeg1 ? (f.mono ? 17 : 32) : (f.mono ? 9 : 17);
+    final x = i + 4 + side + (f.crc ? 2 : 0);
+    if ((_tagAt(d, x, 'Xing') || _tagAt(d, x, 'Info')) && x + 12 <= d.length) {
+      final flags = _be32(d, x + 4);
+      if ((flags & 1) != 0) {
+        final frames = _be32(d, x + 8);
+        if (frames > 0) {
+          return Duration(
+              milliseconds: (frames * f.samples * 1000 / f.sampleRate).round());
+        }
+      }
+    }
+    // VBRI (Fraunhofer) başlığı
+    final v = i + 4 + 32;
+    if (_tagAt(d, v, 'VBRI') && v + 18 <= d.length) {
+      final frames = _be32(d, v + 14);
+      if (frames > 0) {
+        return Duration(
+            milliseconds: (frames * f.samples * 1000 / f.sampleRate).round());
+      }
+    }
+    // Sabit bitrate: ses baytları / bitrate
+    var end = d.length;
+    if (end >= 128 && _tagAt(d, end - 128, 'TAG')) end -= 128;
+    final bytes = end - i;
+    if (bytes <= 0) return null;
+    return Duration(milliseconds: (bytes * 8 / f.bitrate).round());
+  }
+  return null;
+}
+
+Duration? _flacDuration(Uint8List d) {
+  if (d.length < 26 || !_tagAt(d, 0, 'fLaC')) return null;
+  if ((d[4] & 0x7F) != 0) return null; // ilk blok STREAMINFO olmalı
+  final sr = (d[18] << 12) | (d[19] << 4) | (d[20] >> 4);
+  final total = (d[21] & 0x0F) * 4294967296 + _be32(d, 22);
+  if (sr <= 0 || total <= 0) return null;
+  return Duration(milliseconds: (total * 1000 / sr).round());
+}
+
+Duration? _mp4Duration(Uint8List d) {
+  final moov = _findAtom(d, 0, d.length, 'moov');
+  if (moov == null) return null;
+  final mvhd = _findAtom(d, moov.start, moov.end, 'mvhd');
+  if (mvhd == null) return null;
+  final s = mvhd.start;
+  final ver = d[s];
+  int timescale, dur;
+  if (ver == 1) {
+    if (s + 32 > mvhd.end) return null;
+    timescale = _be32(d, s + 20);
+    dur = _be32(d, s + 24) * 4294967296 + _be32(d, s + 28);
+  } else {
+    if (s + 20 > mvhd.end) return null;
+    timescale = _be32(d, s + 12);
+    dur = _be32(d, s + 16);
+  }
+  if (timescale <= 0 || dur <= 0) return null;
+  return Duration(milliseconds: (dur * 1000 / timescale).round());
+}
+
+
+// ---------------------------------------------------------------- ReplayGain
+
+int _lc(int b) => (b >= 65 && b <= 90) ? b + 32 : b;
+
+/// [key] (kiçik hərflə) açarını [from, to) aralığında axtarır; UTF-16 kimi
+/// hərflər arasında tək sıfır baytına icazə verir. Tapılsa açarın bitdiyi yeri qaytarır.
+int _findKeyEnd(Uint8List d, List<int> key, int from, int to) {
+  final n = key.length;
+  if (to > d.length) to = d.length;
+  for (var i = from; i < to; i++) {
+    if (_lc(d[i]) != key[0]) continue;
+    var j = 1, p = i + 1, z = 0;
+    while (j < n && p < to) {
+      final b = d[p];
+      if (b == 0) {
+        if (++z > 1) break;
+        p++;
+        continue;
+      }
+      z = 0;
+      if (_lc(b) != key[j]) break;
+      j++;
+      p++;
+    }
+    if (j == n) return p;
+  }
+  return -1;
+}
+
+double? _gainAfter(Uint8List d, int at) {
+  final sb = StringBuffer();
+  for (var i = at; i < d.length && sb.length < 40 && i < at + 120; i++) {
+    if (d[i] != 0) sb.writeCharCode(d[i]);
+  }
+  final m = RegExp(r'[-+]?\d+(?:[.,]\d+)?').firstMatch(sb.toString());
+  if (m == null) return null;
+  final v = double.tryParse(m.group(0)!.replaceAll(',', '.'));
+  if (v == null || v.abs() > 40) return null;
+  return v;
+}
+
+final _kTrackGain = 'replaygain_track_gain'.codeUnits;
+final _kAlbumGain = 'replaygain_album_gain'.codeUnits;
+
+/// Fayldakı ReplayGain etiketini (dB) oxuyur: ID3 TXXX, Vorbis/FLAC şərhi, MP4 "----" atomu.
+/// Yoxdursa null. Heç vaxt xəta atmır.
+double? readReplayGain(Uint8List d, String ext) {
+  try {
+    final e = ext.toLowerCase();
+    final ranges = <(int, int)>[];
+    if (e == 'mp3' || e == 'aac') {
+      if (d.length > 10 && d[0] == 0x49 && d[1] == 0x44 && d[2] == 0x33) {
+        ranges.add((0, 10 + _syncsafe(d, 6)));
+      } else {
+        ranges.add((0, 65536));
+      }
+      ranges.add((d.length > 65536 ? d.length - 65536 : 0, d.length)); // APE / ID3v1
+    } else if (e == 'flac' || e == 'ogg' || e == 'opus') {
+      ranges.add((0, 4 * 1024 * 1024));
+    } else {
+      ranges.add((0, d.length)); // m4a: moov faylın sonunda ola bilər
+    }
+    for (final key in [_kTrackGain, _kAlbumGain]) {
+      for (final r in ranges) {
+        final end = _findKeyEnd(d, key, r.$1, r.$2);
+        if (end < 0) continue;
+        final v = _gainAfter(d, end);
+        if (v != null) return v;
+      }
+    }
+  } catch (_) {}
+  return null;
+}

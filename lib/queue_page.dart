@@ -60,6 +60,12 @@ class _QueuePageState extends State<QueuePage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(color: Colors.white60)),
+                            if (next.isNotEmpty)
+                              Text('Sırada: ${countAndTotal(next)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white38, fontSize: 12)),
                           ],
                         ),
                       ),

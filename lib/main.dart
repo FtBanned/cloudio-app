@@ -9,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import 'audio_handler.dart';
-import 'cover_lookup.dart' show kOnlineCovers;
+import 'cover_lookup.dart'
+    show CoverCandidate, fetchCoverImage, kOnlineCovers, searchCandidates;
 import 'lyrics.dart';
 import 'player_controller.dart';
 import 'queue_page.dart';
@@ -47,6 +48,27 @@ String formatDuration(Duration d) {
   final m = d.inMinutes;
   final s = d.inSeconds % 60;
   return '$m:${s.toString().padLeft(2, '0')}';
+}
+
+/// Şarkı listesinin toplam süresi: "3 sa 24 dk", "47 dk", "35 sn". Süre bilinmiyorsa ''.
+String formatTotal(Iterable<Song> list) {
+  var ms = 0;
+  for (final s in list) {
+    ms += s.duration?.inMilliseconds ?? 0;
+  }
+  if (ms <= 0) return '';
+  final d = Duration(milliseconds: ms);
+  final h = d.inHours;
+  final m = d.inMinutes % 60;
+  if (h > 0) return '$h sa $m dk';
+  if (d.inMinutes > 0) return '${d.inMinutes} dk';
+  return '${d.inSeconds} sn';
+}
+
+/// "12 şarkı • 47 dk"
+String countAndTotal(List<Song> list) {
+  final t = formatTotal(list);
+  return t.isEmpty ? '${list.length} şarkı' : '${list.length} şarkı • $t';
 }
 
 /// Kapağın ortalama rengini arka plan için koyulaştırır (Spotify gibi).
@@ -191,22 +213,77 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  bool _createOpen = false; // "Oluştur" penceresi açık mı
+  double _barH = 80; // pencere açılırken ölçülen alt çubuk yüksekliği
+  final _barKey = GlobalKey(); // alt çubuğun (mini oynatıcı + menü) yüksekliğini ölçmek için
 
   final _pages = const [HomePage(), SearchPage(), LibraryPage()];
 
   void _onTap(int i) {
     if (i == 3) {
-      showCreateSheet(context);
+      if (_createOpen) {
+        setState(() => _createOpen = false);
+      } else {
+        final h = _barKey.currentContext?.size?.height ?? 80;
+        setState(() {
+          _barH = h;
+          _createOpen = true;
+        });
+      }
       return;
     }
-    setState(() => _index = i);
+    setState(() {
+      _createOpen = false;
+      _index = i;
+    });
+  }
+
+  Future<void> _createPlaylist() async {
+    setState(() => _createOpen = false);
+    final name = await askText(context,
+        title: 'Çalma listesine ad ver',
+        initial:
+            'Çalma listem #${PlayerController.instance.playlists.length + 1}');
+    if (name == null || !mounted) return;
+    final pl = PlayerController.instance.createPlaylist(name);
+    openPlaylist(context, pl);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true, // siyahı alttakı şəffaf çubuğun arxasına qədər uzansın
-      body: SafeArea(bottom: false, child: _pages[_index]),
+      body: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            _pages[_index],
+            Positioned.fill(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.06),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: child,
+                  ),
+                ),
+                child: _createOpen
+                    ? _CreateOverlay(
+                        key: const ValueKey('create-open'),
+                        bottomOffset: _barH,
+                        onClose: () => setState(() => _createOpen = false),
+                        onCreatePlaylist: _createPlaylist,
+                      )
+                    : const SizedBox.shrink(key: ValueKey('create-closed')),
+              ),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -219,37 +296,49 @@ class _MainShellState extends State<MainShell> {
               ),
             ),
             child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MiniPlayer(),
-          NavigationBar(
-            backgroundColor: Colors.transparent,
-            indicatorColor: Colors.transparent,
-            selectedIndex: _index,
-            onDestinationSelected: _onTap,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Ana Sayfa',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.search),
-                label: 'Arama',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.library_music_outlined),
-                selectedIcon: Icon(Icons.library_music),
-                label: 'Kitaplığın',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.add),
-                label: 'Oluştur',
-              ),
-            ],
-          ),
-        ],
-      ),
+              key: _barKey,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MiniPlayer(),
+                SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    height: 72,
+                    child: Row(
+                      children: [
+                        _NavItem(
+                          label: 'Ana Sayfa',
+                          selected: !_createOpen && _index == 0,
+                          icon: const Icon(Icons.home_outlined),
+                          selectedIcon: const Icon(Icons.home),
+                          onTap: () => _onTap(0),
+                        ),
+                        _NavItem(
+                          label: 'Arama',
+                          selected: !_createOpen && _index == 1,
+                          icon: const Icon(Icons.search),
+                          onTap: () => _onTap(1),
+                        ),
+                        _NavItem(
+                          label: 'Kitaplığın',
+                          selected: !_createOpen && _index == 2,
+                          icon: const _LibraryIcon(filled: false),
+                          selectedIcon: const _LibraryIcon(filled: true),
+                          onTap: () => _onTap(2),
+                        ),
+                        _NavItem(
+                          label: 'Oluştur',
+                          selected: false,
+                          hideLabel: _createOpen,
+                          icon: _CreateButton(open: _createOpen),
+                          onTap: () => _onTap(3),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -257,40 +346,211 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-void showCreateSheet(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: kCard,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Colors.white12,
-              child: Icon(Icons.music_note),
+/// Alt menüdeki tek bir düğme (simge + yazı). Seçiliyken beyaz, değilken gri.
+class _NavItem extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool hideLabel;
+  final Widget icon;
+  final Widget? selectedIcon;
+  final VoidCallback onTap;
+  const _NavItem({
+    required this.label,
+    required this.selected,
+    required this.icon,
+    required this.onTap,
+    this.selectedIcon,
+    this.hideLabel = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? Colors.white : const Color(0xFFB3B3B3);
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: IconTheme(
+                  data: IconThemeData(size: 28, color: color),
+                  child: selected ? (selectedIcon ?? icon) : icon,
+                ),
+              ),
             ),
-            title: const Text('Çalma Listesi',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Şarkı içeren bir çalma listesi oluştur'),
-            onTap: () async {
-              Navigator.pop(ctx);
-              final name = await askText(context,
-                  title: 'Çalma listesine ad ver',
-                  initial: 'Çalma listem #${PlayerController.instance.playlists.length + 1}');
-              if (name == null || !context.mounted) return;
-              final pl = PlayerController.instance.createPlaylist(name);
-              openPlaylist(context, pl);
-            },
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: hideLabel ? 0 : 1,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "+" simgesi: açılınca dönerek "×" olur ve içi beyaz yuvarlağa dönüşür.
+class _CreateButton extends StatelessWidget {
+  final bool open;
+  const _CreateButton({required this.open});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: open ? Colors.white : Colors.transparent,
+      ),
+      child: AnimatedRotation(
+        turns: open ? 0.125 : 0, // 45°: "+" → "×"
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutBack,
+        child: TweenAnimationBuilder<Color?>(
+          duration: const Duration(milliseconds: 300),
+          tween: ColorTween(
+            end: open ? Colors.black : const Color(0xFFB3B3B3),
           ),
-          const SizedBox(height: 8),
+          builder: (_, c, __) => Icon(Icons.add, size: 30, color: c),
+        ),
+      ),
+    );
+  }
+}
+
+/// Alt menünün üstünde açılan buzlu cam pencere (şimdilik sadece "Çalma Listesi").
+class _CreateOverlay extends StatelessWidget {
+  final double bottomOffset;
+  final VoidCallback onClose;
+  final VoidCallback onCreatePlaylist;
+  const _CreateOverlay({
+    super.key,
+    required this.bottomOffset,
+    required this.onClose,
+    required this.onCreatePlaylist,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onClose,
+              child: ColoredBox(color: Colors.black.withAlpha(40)),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: bottomOffset + 8,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    // Panel rengi (0-255 arası alpha: büyüdükçe daha opak)
+                    color: const Color(0xFF3A3A3A).withAlpha(150),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      leading: const CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Colors.white12,
+                        child: Icon(Icons.music_note),
+                      ),
+                      title: const Text('Çalma Listesi',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle:
+                          const Text('Şarkı içeren bir çalma listesi oluştur'),
+                      onTap: onCreatePlaylist,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
-    ),
-  );
+    );
+  }
+}
+
+/// Spotify'ın "Kitaplığın" simgesi: iki ince çubuk + hafif eğik bir dikdörtgen.
+class _LibraryIcon extends StatelessWidget {
+  final bool filled;
+  const _LibraryIcon({required this.filled});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = IconTheme.of(context);
+    final size = theme.size ?? 28;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _LibraryIconPainter(theme.color ?? Colors.white, filled),
+      ),
+    );
+  }
+}
+
+class _LibraryIconPainter extends CustomPainter {
+  final Color color;
+  final bool filled;
+  _LibraryIconPainter(this.color, this.filled);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final k = size.width / 24;
+    canvas.scale(k, k);
+    final paint = Paint()
+      ..color = color
+      ..style = filled ? PaintingStyle.fill : PaintingStyle.stroke
+      ..strokeWidth = 1.7
+      ..isAntiAlias = true;
+    RRect bar(double x, double y, double w, double h) =>
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, h), const Radius.circular(1));
+    // inset: çizgi modunda kenar dışarı taşmasın
+    final i = filled ? 0.0 : 0.85;
+    canvas.drawRRect(bar(3 + i, 4 + i, 2.4 - 2 * i + (filled ? 0 : 0.5), 16 - 2 * i), paint);
+    canvas.drawRRect(bar(8 + i, 4 + i, 2.4 - 2 * i + (filled ? 0 : 0.5), 16 - 2 * i), paint);
+    canvas.save();
+    canvas.translate(17, 12);
+    canvas.rotate(-0.2);
+    canvas.drawRRect(
+      bar(-3 + i, -8 + i, 6 - 2 * i, 16 - 2 * i),
+      paint,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_LibraryIconPainter old) =>
+      old.color != color || old.filled != filled;
 }
 
 // ================= Ortak küçük parçalar =================
@@ -345,6 +605,12 @@ class SongTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (song.duration != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Text(formatDuration(song.duration!),
+                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
+            ),
           if (song.liked)
             const Icon(Icons.check_circle, color: kGreen, size: 20),
           IconButton(
@@ -476,7 +742,7 @@ class MiniPlayer extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 StreamBuilder<Duration>(
-                  stream: c.player.positionStream,
+                  stream: c.positionStream,
                   builder: (context, snap) {
                     final dur = c.player.duration?.inMilliseconds ?? 0;
                     final pos = snap.data?.inMilliseconds ?? 0;
@@ -689,6 +955,11 @@ class NowPlayingPage extends StatelessWidget {
                     Row(
                       children: [
                         const _SleepTimerButton(),
+                        IconButton(
+                          tooltip: 'Çalma ayarları',
+                          icon: const Icon(Icons.tune),
+                          onPressed: () => showPlaybackSettingsSheet(context),
+                        ),
                         const Spacer(),
                         IconButton(
                           tooltip: 'Sıra',
@@ -836,7 +1107,7 @@ class _CoverLyricLineState extends State<_CoverLyricLine> {
   void initState() {
     super.initState();
     _idx = widget.lyrics.indexAt(c.player.position + _lookahead);
-    _sub = c.player.positionStream.listen(_onPos);
+    _sub = c.positionStream.listen(_onPos);
   }
 
   void _onPos(Duration pos) {
@@ -905,7 +1176,7 @@ class SeekBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = PlayerController.instance;
     return StreamBuilder<Duration>(
-      stream: c.player.positionStream,
+      stream: c.positionStream,
       builder: (context, snap) {
         final pos = snap.data ?? Duration.zero;
         final dur = c.player.duration ?? Duration.zero;
@@ -971,6 +1242,8 @@ class _HomePageState extends State<HomePage> {
       listenable: c,
       builder: (context, _) {
         final songs = c.songs;
+        final recent = _musicOnly ? const <Song>[] : c.recentSongs;
+        final top = _musicOnly ? const <Song>[] : c.topSongs;
         final count = _musicOnly
             ? songs.length
             : (songs.length < 6 ? songs.length : 6);
@@ -997,6 +1270,10 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+          if (recent.isNotEmpty)
+            _SongShelf(title: 'Son çaldıkların', songs: recent),
+          if (top.isNotEmpty)
+            _SongShelf(title: 'En çok dinlediklerin', songs: top, showCount: true),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(_musicOnly ? 'Tüm şarkılar' : 'Dinlemeye başla',
@@ -1027,6 +1304,72 @@ class _HomePageState extends State<HomePage> {
           },
         );
       },
+    );
+  }
+}
+
+/// Ana sayfadaki yatay şarkı rafı (kapak kartları).
+class _SongShelf extends StatelessWidget {
+  final String title;
+  final List<Song> songs;
+  final bool showCount; // true: sanatçı yerine "N kez" yaz
+  const _SongShelf(
+      {required this.title, required this.songs, this.showCount = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlayerController.instance;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Text(title,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        ),
+        SizedBox(
+          height: 212,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: songs.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) {
+              final s = songs[i];
+              final playing = c.current == s;
+              return GestureDetector(
+                onTap: () => c.playSong(s, context: songs),
+                child: SizedBox(
+                  width: 140,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Cover(size: 140, bytes: s.cover),
+                      const SizedBox(height: 8),
+                      Text(s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: playing ? kGreen : Colors.white)),
+                      const SizedBox(height: 2),
+                      Text(
+                          showCount
+                              ? '${s.playCount} kez çalındı'
+                              : s.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.white60)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1250,7 +1593,7 @@ class _LibraryPageState extends State<LibraryPage> {
               leading: const _IconSquare(
                   Icons.favorite, [Color(0xFF4A2BD8), Color(0xFF9DB6E8)]),
               title: 'Beğenilen Şarkılar',
-              subtitle: 'Çalma listesi • ${liked.length} şarkı',
+              subtitle: 'Çalma listesi • ${countAndTotal(liked)}',
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const CollectionPage.liked(),
               )),
@@ -1259,7 +1602,7 @@ class _LibraryPageState extends State<LibraryPage> {
               leading: const _IconSquare(
                   Icons.library_music, [Color(0xFF1B6B3A), kGreen]),
               title: 'Tüm Şarkılar',
-              subtitle: 'Kitaplık • ${c.songs.length} şarkı',
+              subtitle: 'Kitaplık • ${countAndTotal(c.songs)}',
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const CollectionPage.all(),
               )),
@@ -1299,7 +1642,7 @@ class _LibraryPageState extends State<LibraryPage> {
               _CollectionRow(
                 leading: MosaicCover(songs: p.songs, size: 56),
                 title: p.name,
-                subtitle: 'Çalma listesi • ${p.songs.length} şarkı',
+                subtitle: 'Çalma listesi • ${countAndTotal(p.songs)}',
                 onTap: () => openPlaylist(context, p),
               ),
             if (c.songs.isEmpty && !c.loading)
@@ -1586,7 +1929,7 @@ class _CollectionPageState extends State<CollectionPage> {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('${list.length} şarkı',
+                    child: Text(countAndTotal(list),
                         style: const TextStyle(color: Colors.white60)),
                   ),
                   Padding(
@@ -1887,8 +2230,8 @@ class GroupListPage extends StatelessWidget {
                                       fontWeight: FontWeight.w600)),
                               subtitle: Text(
                                   byAlbum
-                                      ? '${g.songs.first.artist} • ${g.songs.length} şarkı'
-                                      : '${g.songs.length} şarkı',
+                                      ? '${g.songs.first.artist} • ${countAndTotal(g.songs)}'
+                                      : countAndTotal(g.songs),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -2007,6 +2350,14 @@ void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
             onTap: () {
               Navigator.pop(ctx);
               c.toggleLike(song);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit_outlined),
+            title: const Text('Şarkı bilgilerini düzenle'),
+            onTap: () {
+              Navigator.pop(ctx);
+              openEditSong(context, song);
             },
           ),
           ListTile(
@@ -2493,7 +2844,7 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
     super.initState();
     _keys = List.generate(widget.lyrics.lines.length, (_) => GlobalKey());
     _idx = widget.lyrics.indexAt(c.player.position + _lookahead);
-    _sub = c.player.positionStream.listen(_onPos);
+    _sub = c.positionStream.listen(_onPos);
     WidgetsBinding.instance.addPostFrameCallback((_) => _reveal(jump: true));
   }
 
@@ -2668,6 +3019,417 @@ class LyricsPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ================= Şarkı bilgisini düzenleme =================
+void openEditSong(BuildContext context, Song song) {
+  Navigator.of(context).push(MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (_) => EditSongPage(song: song),
+  ));
+}
+
+class EditSongPage extends StatefulWidget {
+  final Song song;
+  const EditSongPage({super.key, required this.song});
+
+  @override
+  State<EditSongPage> createState() => _EditSongPageState();
+}
+
+class _EditSongPageState extends State<EditSongPage> {
+  late final TextEditingController _title;
+  late final TextEditingController _artist;
+  late final TextEditingController _album;
+  Uint8List? _cover;
+  bool _coverChanged = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = widget.song;
+    _title = TextEditingController(text: s.title);
+    _artist = TextEditingController(
+        text: s.artist == kUnknownArtist ? '' : s.artist);
+    _album = TextEditingController(text: s.album);
+    _cover = s.cover;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _artist.dispose();
+    _album.dispose();
+    super.dispose();
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _pickCover() async {
+    try {
+      final b = await PlayerController.instance.pickCoverImage();
+      if (b == null || !mounted) return;
+      setState(() {
+        _cover = b;
+        _coverChanged = true;
+      });
+    } catch (_) {
+      _toast('Resim okunamadı');
+    }
+  }
+
+  /// İnternette serbest aramayla sonuç listesi açar; seçilen sonucun adı, sanatçısı,
+  /// albümü ve kapağı alanlara doldurulur (Kaydet'e basana kadar değişmez).
+  Future<void> _openSearch() async {
+    final q = '${_artist.text} ${_title.text}'.trim();
+    final picked = await showModalBottomSheet<CoverCandidate>(
+      context: context,
+      backgroundColor: kCard,
+      shape: _sheetShape,
+      isScrollControlled: true,
+      builder: (_) => _CandidateSheet(initial: q),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _busy = true);
+    final img = await fetchCoverImage(picked.artUrl);
+    if (!mounted) return;
+    setState(() {
+      _title.text = picked.title;
+      _artist.text = picked.artist;
+      _album.text = picked.album;
+      if (img != null) {
+        _cover = img;
+        _coverChanged = true;
+      }
+      _busy = false;
+    });
+    if (img == null) _toast('Kapak indirilemedi, bilgiler dolduruldu');
+  }
+
+  Future<void> _save() async {
+    await PlayerController.instance.updateSongInfo(
+      widget.song,
+      title: _title.text,
+      artist: _artist.text,
+      album: _album.text,
+      cover: _cover,
+      coverChanged: _coverChanged,
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kBg,
+      appBar: AppBar(
+        backgroundColor: kBg,
+        title: const Text('Şarkı bilgilerini düzenle'),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : _save,
+            child: const Text('Kaydet',
+                style: TextStyle(color: kGreen, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(
+            child: GestureDetector(
+              onTap: _busy ? null : _pickCover,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Cover(size: 180, bytes: _cover),
+                  if (_busy)
+                    const CircularProgressIndicator(color: kGreen),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _pickCover,
+                icon: const Icon(Icons.image_outlined),
+                label: const Text('Resim seç'),
+              ),
+              if (kOnlineCovers)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _openSearch,
+                  icon: const Icon(Icons.search),
+                  label: const Text('İnternette ara'),
+                ),
+              if (_cover != null)
+                OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(() {
+                            _cover = null;
+                            _coverChanged = true;
+                          }),
+                  icon: const Icon(Icons.hide_image_outlined),
+                  label: const Text('Kapağı kaldır'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _title,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Başlık'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _artist,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Sanatçı'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _album,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Albüm'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// ================= Çalma ayarları: crossfade + ses seviyesi dengeleme =================
+String crossfadeLabel(double v) {
+  if (v <= 0) return 'Kapalı';
+  if (v < 1) return 'Boşluksuz geçiş';
+  return '${v.round()} saniye';
+}
+
+void showPlaybackSettingsSheet(BuildContext context) {
+  final c = PlayerController.instance;
+  const options = <double>[0, 0.25, 3, 5, 8, 12];
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+        child: ListenableBuilder(
+          listenable: c,
+          builder: (context, _) => ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Text('Çalma ayarları',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              if (c.crossfadeSupported) ...[
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Text('Şarkılar arası geçiş',
+                      style: TextStyle(
+                          color: Colors.white70, fontWeight: FontWeight.w600)),
+                ),
+                for (final o in options)
+                  ListTile(
+                    dense: true,
+                    title: Text(crossfadeLabel(o)),
+                    trailing: c.crossfadeSecs == o
+                        ? const Icon(Icons.check, color: kGreen)
+                        : null,
+                    onTap: () => c.setCrossfade(o),
+                  ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                      'Sıradaki şarkı otomatik geçişte önceden hazırlanır. '
+                      'Tek şarkı tekrarında ve uyku zamanlayıcısı "şarkı bitince" iken uygulanmaz.',
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ),
+                const Divider(height: 1),
+              ],
+              SwitchListTile(
+                activeThumbColor: kGreen,
+                title: const Text('Ses seviyesini dengele'),
+                subtitle: Text(
+                    'Şarkılar arası ses farkını azaltır (ReplayGain etiketine göre). '
+                    '${c.gainTaggedCount}/${c.songs.length} şarkıda etiket var.',
+                    style:
+                        const TextStyle(color: Colors.white54, fontSize: 12)),
+                value: c.normalizeOn,
+                onChanged: c.setNormalize,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+
+/// "İnternette ara" penceresi: serbest metinle arar, sonuç listesinden seçtirir.
+class _CandidateSheet extends StatefulWidget {
+  final String initial;
+  const _CandidateSheet({required this.initial});
+
+  @override
+  State<_CandidateSheet> createState() => _CandidateSheetState();
+}
+
+class _CandidateSheetState extends State<_CandidateSheet> {
+  late final TextEditingController _q;
+  List<CoverCandidate> _results = const [];
+  bool _loading = false;
+  String? _error;
+  bool _searched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _q = TextEditingController(text: widget.initial);
+    if (widget.initial.trim().isNotEmpty) _search();
+  }
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final q = _q.text.trim();
+    if (q.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final r = await searchCandidates(q);
+      if (!mounted) return;
+      setState(() {
+        _results = r;
+        _searched = true;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Arama yapılamadı, bağlantını kontrol et';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: h * 0.8,
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('İnternette ara',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                    'Bir sonuca dokun: ad, sanatçı, albüm ve kapak doldurulur.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: TextField(
+                controller: _q,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _search(),
+                decoration: InputDecoration(
+                  hintText: 'Sanatçı ve şarkı adı',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _search,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: kGreen))
+                  : _error != null
+                      ? Center(
+                          child: Text(_error!,
+                              style: const TextStyle(color: Colors.white60)))
+                      : (_searched && _results.isEmpty)
+                          ? const Center(
+                              child: Text('Sonuç yok, aramayı değiştir',
+                                  style: TextStyle(color: Colors.white60)))
+                          : ListView.builder(
+                              itemCount: _results.length,
+                              itemBuilder: (_, i) {
+                                final r = _results[i];
+                                return ListTile(
+                                  leading: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.network(
+                                      r.thumbUrl,
+                                      width: 48,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        width: 48,
+                                        height: 48,
+                                        color: Colors.grey.shade800,
+                                        child: const Icon(Icons.music_note),
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(r.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  subtitle: Text(
+                                      r.album.isEmpty
+                                          ? r.artist
+                                          : '${r.artist} • ${r.album}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.white60)),
+                                  onTap: () => Navigator.pop(context, r),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

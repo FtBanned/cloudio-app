@@ -61,3 +61,14 @@ Future<Uri?> writeCoverFile(String key, Uint8List bytes) async {
     return null;
   }
 }
+
+/// Süre hesaplamak için şarkı dosyasını okur (yoksa null).
+Future<Uint8List?> readAudioBytes(String? path) async {
+  if (path == null) return null;
+  try {
+    return await File(path).readAsBytes();
+  } catch (e) {
+    debugPrint('[Cloudio] fayl oxunmadı ($path): $e');
+    return null;
+  }
+}

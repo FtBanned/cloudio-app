@@ -23,6 +23,11 @@ class SavedSong {
   final Lyrics? lyrics;
   final bool lyricsNotFound;
   final String? file; // telefonda: tətbiq qovluğundakı səs faylının adı
+  final int? durationMs; // null: hələ yoxlanmayıb, -1: yoxlanıb amma bilinmir
+  final int playCount;
+  final int lastPlayedMs; // 0: heç çalınmayıb
+  final double? gainDb; // ReplayGain (dB), yoxdursa null
+  final bool gainTried; // etiket bir dəfə yoxlanıb
 
   SavedSong({
     required this.id,
@@ -37,6 +42,11 @@ class SavedSong {
     required this.lyrics,
     required this.lyricsNotFound,
     this.file,
+    this.durationMs,
+    this.playCount = 0,
+    this.lastPlayedMs = 0,
+    this.gainDb,
+    this.gainTried = false,
   });
 }
 
@@ -44,6 +54,32 @@ class SavedPlaylist {
   final String name;
   final List<String> ids;
   SavedPlaylist(this.name, this.ids);
+}
+
+/// Son çalma növbəsi (tətbiq bağlanıb açılanda bərpa üçün).
+class SavedQueue {
+  final List<String> ids; // növbədəki mahnıların sırası
+  final List<int> order; // qarışıq sıra (ids indeksləri), boş ola bilər
+  final int? cur; // ids içində hazırkı mahnı
+  final int pos; // order içində hazırkı yer
+  final bool shuffle;
+  final int repeat; // RepeatKind.index
+  final String name;
+  SavedQueue({
+    required this.ids,
+    required this.order,
+    required this.cur,
+    required this.pos,
+    required this.shuffle,
+    required this.repeat,
+    required this.name,
+  });
+}
+
+class SavedPosition {
+  final String id;
+  final int ms;
+  SavedPosition(this.id, this.ms);
 }
 
 class SavedLibrary {
@@ -134,6 +170,11 @@ class CloudioStore {
             lyrics: _lyricsFromMap(m['lyrics']),
             lyricsNotFound: m['lyricsNotFound'] as bool? ?? false,
             file: m['file'] as String?,
+            durationMs: m['dur'] as int?,
+            playCount: m['plays'] as int? ?? 0,
+            lastPlayedMs: m['last'] as int? ?? 0,
+            gainDb: (m['gain'] as num?)?.toDouble(),
+            gainTried: m['gt'] as bool? ?? false,
           ));
         } catch (e) {
           debugPrint('[Cloudio DB] bir mahnı oxunmadı (${snap.key}): $e');
@@ -191,6 +232,11 @@ class CloudioStore {
     Lyrics? lyrics,
     required bool lyricsNotFound,
     String? file,
+    int? durationMs,
+    int playCount = 0,
+    int lastPlayedMs = 0,
+    double? gainDb,
+    bool gainTried = false,
     Uint8List? audio,
   }) async {
     final db = _db;
@@ -208,6 +254,11 @@ class CloudioStore {
         'lyrics': lyrics == null ? null : _lyricsToMap(lyrics),
         'lyricsNotFound': lyricsNotFound,
         'file': file,
+        'dur': durationMs,
+        'plays': playCount,
+        'last': lastPlayedMs,
+        'gain': gainDb,
+        'gt': gainTried,
       };
       await db.transaction((txn) async {
         await _songs.record(id).put(txn, meta);
@@ -247,6 +298,109 @@ class CloudioStore {
       });
     } catch (e) {
       debugPrint('[Cloudio DB] siyahılar yazıla bilmədi: $e');
+    }
+  }
+
+  // ---- son çalma vəziyyəti ----
+  Future<void> saveQueue(SavedQueue q) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('queue').put(db, <String, Object?>{
+        'ids': q.ids,
+        'order': q.order,
+        'cur': q.cur,
+        'pos': q.pos,
+        'shuffle': q.shuffle,
+        'repeat': q.repeat,
+        'name': q.name,
+      });
+    } catch (e) {
+      debugPrint('[Cloudio DB] növbə yazıla bilmədi: $e');
+    }
+  }
+
+  Future<SavedQueue?> loadQueue() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('queue').get(db);
+      if (m == null) return null;
+      return SavedQueue(
+        ids: [for (final e in (m['ids'] as List? ?? const [])) e as String],
+        order: [for (final e in (m['order'] as List? ?? const [])) e as int],
+        cur: m['cur'] as int?,
+        pos: m['pos'] as int? ?? 0,
+        shuffle: m['shuffle'] as bool? ?? false,
+        repeat: m['repeat'] as int? ?? 0,
+        name: m['name'] as String? ?? '',
+      );
+    } catch (e) {
+      debugPrint('[Cloudio DB] növbə oxunmadı: $e');
+      return null;
+    }
+  }
+
+  Future<void> savePosition(String id, int ms) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta
+          .record('position')
+          .put(db, <String, Object?>{'id': id, 'ms': ms});
+    } catch (e) {
+      debugPrint('[Cloudio DB] mövqe yazıla bilmədi: $e');
+    }
+  }
+
+  Future<SavedPosition?> loadPosition() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('position').get(db);
+      if (m == null) return null;
+      final id = m['id'] as String?;
+      if (id == null) return null;
+      return SavedPosition(id, m['ms'] as int? ?? 0);
+    } catch (e) {
+      debugPrint('[Cloudio DB] mövqe oxunmadı: $e');
+      return null;
+    }
+  }
+
+  // ---- çalma ayarları (crossfade, ses seviyəsi tarazlama) ----
+  Future<void> saveSettings({
+    required double crossfade,
+    required bool normalize,
+    int coverVersion = 0,
+  }) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('settings').put(db, <String, Object?>{
+        'crossfade': crossfade,
+        'normalize': normalize,
+        'coverV': coverVersion,
+      });
+    } catch (e) {
+      debugPrint('[Cloudio DB] ayarlar yazıla bilmədi: $e');
+    }
+  }
+
+  Future<({double crossfade, bool normalize, int coverVersion})?> loadSettings() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('settings').get(db);
+      if (m == null) return null;
+      return (
+        crossfade: (m['crossfade'] as num?)?.toDouble() ?? 0.0,
+        normalize: m['normalize'] as bool? ?? false,
+        coverVersion: m['coverV'] as int? ?? 0,
+      );
+    } catch (e) {
+      debugPrint('[Cloudio DB] ayarlar oxunmadı: $e');
+      return null;
     }
   }
 }

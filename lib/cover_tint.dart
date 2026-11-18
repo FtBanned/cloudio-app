@@ -28,3 +28,26 @@ Future<ui.Color?> coverTint(Uint8List bytes) async {
     return null;
   }
 }
+
+/// Seçilen resmi doğrular; çok büyükse 1000px'e küçültüp PNG yapar (veritabanı şişmesin).
+/// Okunamazsa null döner.
+Future<Uint8List?> normalizeCover(Uint8List bytes) async {
+  try {
+    if (bytes.length <= 700 * 1024) {
+      // küçük dosya: sadece çözülebildiğini doğrula
+      final codec = await ui.instantiateImageCodec(bytes, targetWidth: 16);
+      final f = await codec.getNextFrame();
+      f.image.dispose();
+      codec.dispose();
+      return bytes;
+    }
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 1000);
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    return data?.buffer.asUint8List();
+  } catch (_) {
+    return null;
+  }
+}
