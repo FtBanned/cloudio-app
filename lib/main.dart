@@ -693,7 +693,6 @@ class NowPlayingPage extends StatelessWidget {
   }
 }
 
-<<<<<<< HEAD
 /// Tam ekran pleyerdə yuxu taymeri düyməsi: aktivdirsə yaşıl olur və qalan vaxtı göstərir.
 class _SleepTimerButton extends StatelessWidget {
   const _SleepTimerButton();
@@ -791,8 +790,6 @@ void showSleepSheet(BuildContext context) {
   );
 }
 
-=======
->>>>>>> bbd5e281201e005b323059b6317c55ee32bc10a5
 /// Tam ekran oynatıcıda cover-in altındakı cari söz sətri: mahnı getdikcə yuxarı sürüşərək dəyişir.
 class _CoverLyricLine extends StatefulWidget {
   final Lyrics lyrics;
@@ -947,7 +944,6 @@ class _HomePageState extends State<HomePage> {
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) {
-<<<<<<< HEAD
         final songs = c.songs;
         final count = _musicOnly
             ? songs.length
@@ -973,24 +969,6 @@ class _HomePageState extends State<HomePage> {
                   onTap: () => setState(() => _musicOnly = true),
                 ),
               ],
-=======
-        final count = c.songs.length < 6 ? c.songs.length : 6;
-        return ListView(
-          padding: EdgeInsets.only(
-              bottom: 16 + MediaQuery.of(context).padding.bottom),
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  ProfileAvatar(),
-                  SizedBox(width: 12),
-                  FilterPill('Tümü', selected: true),
-                  SizedBox(width: 8),
-                  FilterPill('Müzik'),
-                ],
-              ),
->>>>>>> bbd5e281201e005b323059b6317c55ee32bc10a5
             ),
           ),
           Padding(
