@@ -390,11 +390,26 @@ class ProfileCircle extends StatelessWidget {
           child: CircleAvatar(
             radius: radius,
             backgroundColor: dark,
-            child: Text(_initial(c.profileName),
-                style: TextStyle(
-                    fontSize: radius * 0.95,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+            // Admin hesabı: hərf əvəzinə assets/admin_bg.jpg fotosu.
+            // Foto tapılmasa köhnə kimi adın ilk hərfi göstərilir.
+            child: ClipOval(
+              child: Image.asset(
+                'assets/admin_bg.jpg',
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                // 1920x1080 şəkli tam ölçüdə yaddaşa yükləməsin
+                cacheWidth: (radius * 2 * 4).round(),
+                errorBuilder: (_, __, ___) => Center(
+                  child: Text(_initial(c.profileName),
+                      style: TextStyle(
+                          fontSize: radius * 0.95,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                ),
+              ),
+            ),
           ),
         );
       },
