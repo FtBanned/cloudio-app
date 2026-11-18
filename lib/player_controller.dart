@@ -521,14 +521,19 @@ class PlayerController extends ChangeNotifier {
     return data;
   }
 
+  int _playToken = 0; // art arda gelen sonraki/önceki isteklerinde eskisini iptal eder
+
   Future<void> _playIndex(int index) async {
     currentIndex = index;
     final s = _queue[index];
     notifyListeners();
 
+    final token = ++_playToken;
     try {
-      // Önceki şarkıyı kesinlikle durdur
-      await player.stop();
+      // iOS: player.stop() ses oturumunu kapatıyor; arka planda/kilit ekranında
+      // oturum bir daha açılamıyor ve sonraki şarkı çalmıyordu. Bu yüzden
+      // mobilde stop() ÇAĞIRMIYORUZ: setFilePath eski kaynağı kendisi değiştirir.
+      if (kIsWeb) await player.stop();
 
       if (kIsWeb) {
         final data = s.bytes ?? await _loadAudioFor(s);
@@ -549,7 +554,8 @@ class PlayerController extends ChangeNotifier {
         }
         await player.setFilePath(path);
       }
-      player.play();
+      if (token != _playToken) return; // bu arada başka şarkıya geçildi
+      unawaited(player.play());
     } catch (e, st) {
       // Hata olursa Hata Ayıklama Konsolu'nda görünür
       debugPrint('Şarkı çalınamadı (${s.title}): $e');
