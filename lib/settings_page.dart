@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 
-import 'main.dart' show kBg, kCard, kGreen, formatTotal, showSleepSheet;
+import 'app_theme.dart';
+import 'main.dart'
+    show
+        kBg,
+        kCard,
+        kGreen,
+        kText,
+        kText38,
+        kText54,
+        kText60,
+        kText70,
+        formatTotal,
+        showSleepSheet;
 import 'player_controller.dart';
 import 'stats_page.dart';
 
@@ -45,12 +57,12 @@ class SettingsPage extends StatelessWidget {
             const _ProfileCard(),
 
             ListTile(
-              leading: const Icon(Icons.insights_outlined, color: kGreen),
+              leading: Icon(Icons.insights_outlined, color: kGreen),
               title: const Text('Şəxsi statistika'),
-              subtitle: const Text(
+              subtitle: Text(
                   'Aylıq sənətçilər, dinləmə vaxtı, ən çox dinlənənlər',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+                  style: TextStyle(color: kText54, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => openStats(context),
             ),
 
@@ -98,19 +110,20 @@ class SettingsPage extends StatelessWidget {
               subtitle: Text(
                   'Şarkılar arası ses farkını azaltır (ReplayGain etiketine göre). '
                   '${c.gainTaggedCount}/${c.songs.length} şarkıda etiket var.',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  style: TextStyle(color: kText54, fontSize: 12)),
               value: c.normalizeOn,
               onChanged: c.setNormalize,
             ),
 
             // ---------- Görünüş ----------
             const _SectionTitle('Görünüş'),
+            const _ThemeBlock(),
             SwitchListTile(
               activeThumbColor: kGreen,
               title: const Text('Dinamik arka plan'),
-              subtitle: const Text(
+              subtitle: Text(
                   'Çalıyor ekranının arka planı albüm kapağının renklerinden oluşur.',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  style: TextStyle(color: kText54, fontSize: 12)),
               value: c.dynamicBg,
               onChanged: c.setDynamicBg,
             ),
@@ -119,36 +132,36 @@ class SettingsPage extends StatelessWidget {
             const _SectionTitle('Uyku zamanlayıcısı'),
             ListTile(
               leading: Icon(Icons.bedtime_outlined,
-                  color: c.sleepActive ? kGreen : Colors.white70),
+                  color: c.sleepActive ? kGreen : kText70),
               title: const Text('Müziği otomatik durdur'),
               subtitle: Text(_sleepStatus(c),
                   style: TextStyle(
-                      color: c.sleepActive ? kGreen : Colors.white54,
+                      color: c.sleepActive ? kGreen : kText54,
                       fontSize: 12)),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white38),
+              trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => showSleepSheet(context),
             ),
 
             // ---------- Kitaplık ----------
             const _SectionTitle('Kitaplık'),
             ListTile(
-              leading: const Icon(Icons.library_music_outlined,
-                  color: Colors.white70),
+              leading: Icon(Icons.library_music_outlined,
+                  color: kText70),
               title: Text('${c.songs.length} şarkı'),
               subtitle: Text(
                   formatTotal(c.songs).isEmpty
                       ? 'Toplam süre henüz bilinmiyor'
                       : 'Toplam süre: ${formatTotal(c.songs)}',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  style: TextStyle(color: kText54, fontSize: 12)),
             ),
 
             // ---------- Hakkında ----------
             const _SectionTitle('Hakkında'),
-            const ListTile(
-              leading: Icon(Icons.info_outline, color: Colors.white70),
+            ListTile(
+              leading: Icon(Icons.info_outline, color: kText70),
               title: Text('Cloudio'),
               subtitle: Text('Sürüm 1.0.0',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  style: TextStyle(color: kText54, fontSize: 12)),
             ),
           ],
         ),
@@ -179,10 +192,10 @@ class _SectionTitle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
       child: Text(text,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.white54,
+              color: kText54,
               letterSpacing: 0.5)),
     );
   }
@@ -214,7 +227,7 @@ class _Block extends StatelessWidget {
                 child: Text(title, style: const TextStyle(fontSize: 16)),
               ),
               Text(trailing,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: kGreen, fontWeight: FontWeight.w600)),
             ],
           ),
@@ -223,10 +236,71 @@ class _Block extends StatelessWidget {
           if (note != null) ...[
             const SizedBox(height: 8),
             Text(note!,
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                style: TextStyle(color: kText54, fontSize: 12)),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Tema rejimi (Tünd / AMOLED / Açıq) və vurğu rəngi seçimi.
+class _ThemeBlock extends StatelessWidget {
+  const _ThemeBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppTheme.instance;
+    return Column(
+      children: [
+        _Block(
+          title: 'Tema',
+          trailing: themeModeLabel(t.mode),
+          note: 'AMOLED: tam qara fon, OLED ekranlarda batareya qənaət edir.',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final m in AppThemeMode.values)
+                _Chip(
+                  label: themeModeLabel(m),
+                  selected: t.mode == m,
+                  onTap: () => t.set(mode: m),
+                ),
+            ],
+          ),
+        ),
+        _Block(
+          title: 'Vurğu rəngi',
+          trailing: kAccentColors[t.accentIndex].$1,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (var i = 0; i < kAccentColors.length; i++)
+                GestureDetector(
+                  onTap: () => t.set(accentIndex: i),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: kAccentColors[i].$2,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: t.accentIndex == i
+                              ? kText
+                              : Colors.transparent,
+                          width: 2.5),
+                    ),
+                    child: t.accentIndex == i
+                        ? const Icon(Icons.check, size: 20, color: Colors.black)
+                        : null,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -250,7 +324,7 @@ class _Chip extends StatelessWidget {
         ),
         child: Text(label,
             style: TextStyle(
-                color: selected ? Colors.black : Colors.white,
+                color: selected ? Colors.black : kText,
                 fontWeight: FontWeight.w600)),
       ),
     );
@@ -344,7 +418,7 @@ class _ProfileCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [dark, kBg],
+          colors: [dark, const Color(0xFF121212)],
         ),
         border: Border.all(color: light.withValues(alpha: 0.35)),
         boxShadow: [
@@ -354,7 +428,8 @@ class _ProfileCard extends StatelessWidget {
               offset: const Offset(0, 8)),
         ],
       ),
-      child: Column(
+      child: DarkZone(
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -424,6 +499,7 @@ class _ProfileCard extends StatelessWidget {
               style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       ),
+      ),
     );
   }
 
@@ -458,9 +534,9 @@ class _ProfileCard extends StatelessWidget {
                   decoration: const InputDecoration(labelText: 'Ad'),
                 ),
                 const SizedBox(height: 8),
-                const Text('Renk',
+                Text('Renk',
                     style: TextStyle(
-                        color: Colors.white70, fontWeight: FontWeight.w600)),
+                        color: kText70, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 12,
@@ -481,7 +557,7 @@ class _ProfileCard extends StatelessWidget {
                             ),
                             border: Border.all(
                                 color: color == i
-                                    ? Colors.white
+                                    ? kText
                                     : Colors.transparent,
                                 width: 2.5),
                           ),
@@ -561,7 +637,7 @@ class _Stat extends StatelessWidget {
                   const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              style: TextStyle(color: kText54, fontSize: 12)),
         ],
       ),
     );

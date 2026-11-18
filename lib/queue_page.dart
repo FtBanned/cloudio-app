@@ -59,13 +59,13 @@ class _QueuePageState extends State<QueuePage> {
                             Text('Çalan: ${c.queueName}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white60)),
+                                style: TextStyle(color: kText60)),
                             if (next.isNotEmpty)
                               Text('Sırada: ${countAndTotal(next)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: Colors.white38, fontSize: 12)),
+                                  style: TextStyle(
+                                      color: kText38, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -85,19 +85,19 @@ class _QueuePageState extends State<QueuePage> {
                     title: Text(cur.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: kGreen, fontWeight: FontWeight.bold)),
                     subtitle: Text(cur.artist,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white60)),
+                        style: TextStyle(color: kText60)),
                     trailing: Container(
                       width: 44,
                       height: 44,
-                      decoration: const BoxDecoration(
-                          color: Colors.white, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                          color: kText, shape: BoxShape.circle),
                       child: IconButton(
-                        color: Colors.black,
+                        color: kBg,
                         icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow),
                         onPressed: c.togglePlay,
                       ),
@@ -105,9 +105,9 @@ class _QueuePageState extends State<QueuePage> {
                   ),
                 Expanded(
                   child: next.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text('Sırada başka şarkı yok',
-                              style: TextStyle(color: Colors.white60)),
+                              style: TextStyle(color: kText60)),
                         )
                       : ReorderableListView.builder(
                           buildDefaultDragHandles: false,
@@ -126,7 +126,7 @@ class _QueuePageState extends State<QueuePage> {
                               subtitle: Text(s.artist,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.white60)),
+                                  style: TextStyle(color: kText60)),
                               onTap: _edit ? null : () => c.playUpNext(i),
                               trailing: _edit
                                   ? IconButton(
@@ -137,8 +137,8 @@ class _QueuePageState extends State<QueuePage> {
                                     )
                                   : ReorderableDragStartListener(
                                       index: i,
-                                      child: const Icon(Icons.drag_handle,
-                                          color: Colors.white70),
+                                      child: Icon(Icons.drag_handle,
+                                          color: kText70),
                                     ),
                             );
                           },
@@ -193,7 +193,7 @@ class _QueueButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? kGreen : Colors.white;
+    final color = active ? kGreen : kText;
     return Material(
       color: kCard,
       borderRadius: BorderRadius.circular(8),

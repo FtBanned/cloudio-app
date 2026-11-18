@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
+import 'app_theme.dart';
 import 'audio_handler.dart';
 import 'cover_tint.dart' show CoverPalette, coverPalette;
 import 'cover_lookup.dart'
@@ -41,9 +42,19 @@ Future<void> main() async {
   runApp(const CloudioApp());
 }
 
-const kGreen = Color(0xFF1DB954);
-const kBg = Color(0xFF121212);
-const kCard = Color(0xFF2A2A2A);
+// Rənglər seçilmiş temadan (app_theme.dart) oxunur: vurğu, fon, kart, yazı.
+Color get kGreen => AppTheme.instance.accent;
+Color get kBg => AppTheme.instance.bg;
+Color get kCard => AppTheme.instance.card;
+Color get kText => AppTheme.instance.fg();
+Color get kText70 => AppTheme.instance.fg(179);
+Color get kText60 => AppTheme.instance.fg(153);
+Color get kText54 => AppTheme.instance.fg(138);
+Color get kText38 => AppTheme.instance.fg(98);
+Color get kText30 => AppTheme.instance.fg(77);
+Color get kText24 => AppTheme.instance.fg(61);
+Color get kText12 => AppTheme.instance.fg(31);
+Color get kText10 => AppTheme.instance.fg(26);
 
 String formatDuration(Duration d) {
   if (d.isNegative) d = Duration.zero;
@@ -300,7 +311,7 @@ Future<int?> showSortSheet(BuildContext context,
                       fontWeight:
                           i == selected ? FontWeight.bold : FontWeight.normal)),
               trailing:
-                  i == selected ? const Icon(Icons.check, color: kGreen) : null,
+                  i == selected ? Icon(Icons.check, color: kGreen) : null,
               onTap: () => Navigator.pop(ctx, i),
             ),
           const SizedBox(height: 8),
@@ -348,16 +359,14 @@ class CloudioApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Cloudio',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: kBg,
-        colorScheme: const ColorScheme.dark(primary: kGreen),
-        useMaterial3: true,
+    return ListenableBuilder(
+      listenable: AppTheme.instance,
+      builder: (context, _) => MaterialApp(
+        title: 'Cloudio',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.instance.themeData,
+        home: const MainShell(),
       ),
-      home: const MainShell(),
     );
   }
 }
@@ -524,7 +533,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Colors.white : const Color(0xFFB3B3B3);
+    final color = selected ? kText : const Color(0xFFB3B3B3);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -575,7 +584,7 @@ class _CreateButton extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: open ? Colors.white : Colors.transparent,
+        color: open ? kText : Colors.transparent,
       ),
       child: AnimatedRotation(
         turns: open ? 0.125 : 0, // 45°: "+" → "×"
@@ -584,7 +593,7 @@ class _CreateButton extends StatelessWidget {
         child: TweenAnimationBuilder<Color?>(
           duration: const Duration(milliseconds: 300),
           tween: ColorTween(
-            end: open ? Colors.black : const Color(0xFFB3B3B3),
+            end: open ? kBg : const Color(0xFFB3B3B3),
           ),
           builder: (_, c, __) => Icon(Icons.add, size: 30, color: c),
         ),
@@ -636,9 +645,9 @@ class _CreateOverlay extends StatelessWidget {
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
-                      leading: const CircleAvatar(
+                      leading: CircleAvatar(
                         radius: 28,
-                        backgroundColor: Colors.white12,
+                        backgroundColor: kText12,
                         child: Icon(Icons.music_note),
                       ),
                       title: const Text('Çalma Listesi',
@@ -760,7 +769,7 @@ class SongTile extends StatelessWidget {
       subtitle: Text(song.artist,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white60)),
+          style: TextStyle(color: kText60)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -768,10 +777,10 @@ class SongTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 6),
               child: Text(formatDuration(song.duration!),
-                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                  style: TextStyle(color: kText54, fontSize: 13)),
             ),
           if (song.liked)
-            const Icon(Icons.check_circle, color: kGreen, size: 20),
+            Icon(Icons.check_circle, color: kGreen, size: 20),
           IconButton(
             icon: const Icon(Icons.more_horiz),
             onPressed: () => showSongMenu(context, song, playlist: playlist),
@@ -818,7 +827,7 @@ class FilterPill extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.black : Colors.white,
+            color: selected ? Colors.black : kText,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -828,13 +837,22 @@ class FilterPill extends StatelessWidget {
 }
 
 // ================= Mini oynatıcı =================
+/// Mini pleyer kapaqdan rənglənir, ona görə seçilmiş temadan asılı olmayaraq tünd qalır.
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const DarkZone(child: _MiniPlayerBody());
+}
+
+class _MiniPlayerBody extends StatelessWidget {
+  const _MiniPlayerBody();
 
   void _openFull(BuildContext context) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const NowPlayingPage(),
+        pageBuilder: (_, __, ___) => const DarkZone(child: NowPlayingPage()),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
               .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
@@ -1176,9 +1194,9 @@ class _SleepTimerButton extends StatelessWidget {
         }
         Widget btn(String text) => TextButton.icon(
               onPressed: () => showSleepSheet(context),
-              icon: const Icon(Icons.bedtime, color: kGreen),
+              icon: Icon(Icons.bedtime, color: kGreen),
               label: Text(text,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: kGreen, fontWeight: FontWeight.bold)),
             );
         final ends = c.sleepEndsAt;
@@ -1204,13 +1222,13 @@ void showShuffleSheet(BuildContext context) {
       String sub) {
     final on = c.shuffleMode == m;
     return ListTile(
-      leading: Icon(icon, color: on ? kGreen : Colors.white70),
+      leading: Icon(icon, color: on ? kGreen : kText70),
       title: Text(title,
           style: TextStyle(
-              color: on ? kGreen : Colors.white, fontWeight: FontWeight.w600)),
+              color: on ? kGreen : kText, fontWeight: FontWeight.w600)),
       subtitle: Text(sub,
-          style: const TextStyle(color: Colors.white54, fontSize: 12)),
-      trailing: on ? const Icon(Icons.check, color: kGreen) : null,
+          style: TextStyle(color: kText54, fontSize: 12)),
+      trailing: on ? Icon(Icons.check, color: kGreen) : null,
       onTap: () {
         Navigator.pop(ctx);
         c.setShuffleMode(on ? ShuffleMode.off : m);
@@ -1241,7 +1259,7 @@ void showShuffleSheet(BuildContext context) {
                   'bu gün çalınanlar geri düşür, eyni sənətçi ardıcıl gəlmir.'),
           if (c.shuffleOn)
             ListTile(
-              leading: const Icon(Icons.close, color: Colors.white70),
+              leading: Icon(Icons.close, color: kText70),
               title: const Text('Söndür'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -1299,8 +1317,8 @@ void showSleepSheet(BuildContext context) {
             ),
             if (c.sleepActive)
               ListTile(
-                leading: const Icon(Icons.close, color: kGreen),
-                title: const Text('Zamanlayıcıyı kapat',
+                leading: Icon(Icons.close, color: kGreen),
+                title: Text('Zamanlayıcıyı kapat',
                     style: TextStyle(color: kGreen)),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -1508,13 +1526,13 @@ class _HomePageState extends State<HomePage> {
                     const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           ),
           if (songs.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(32),
               child: Center(
                 child: Text(
                   'Henüz şarkı yok.\nKitaplığın sekmesinden şarkı ekle.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white60),
+                  style: TextStyle(color: kText60),
                 ),
               ),
             ),
@@ -1579,7 +1597,7 @@ class _SongShelf extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: playing ? kGreen : Colors.white)),
+                              color: playing ? kGreen : kText)),
                       const SizedBox(height: 2),
                       Text(
                           showCount
@@ -1587,8 +1605,8 @@ class _SongShelf extends StatelessWidget {
                               : s.artist,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.white60)),
+                          style: TextStyle(
+                              fontSize: 12, color: kText60)),
                     ],
                   ),
                 ),
@@ -1668,9 +1686,9 @@ class _SearchPageState extends State<SearchPage> {
                 child: q.isEmpty
                     ? _GenreBrowser(genres: groupGenres(c.songs))
                     : matchSongs.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text('Sonuç bulunamadı',
-                                style: TextStyle(color: Colors.white60)),
+                                style: TextStyle(color: kText60)),
                           )
                         : ListView.builder(
                             itemCount: matchSongs.length,
@@ -1716,14 +1734,14 @@ class _GenreBrowser extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (genres.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(24),
         child: Center(
           child: Text(
             'Henüz janr bilgisi yok.\nŞarkıların etiketinde janr varsa burada görünür; '
             'şarkı menüsünden de elle ekleyebilirsin.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white60),
+            style: TextStyle(color: kText60),
           ),
         ),
       );
@@ -1793,7 +1811,7 @@ class CategoryTile extends StatelessWidget {
             ),
             if (subtitle != null)
               Text(subtitle!,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  style: TextStyle(fontSize: 12, color: kText70)),
           ],
         ),
       ),
@@ -1880,8 +1898,8 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                     const SizedBox(height: 4),
                     Text('Kapaklar aranıyor… ${c.coversDone}/${c.coversTotal}',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.white60)),
+                        style: TextStyle(
+                            fontSize: 12, color: kText60)),
                   ],
                 ),
               )
@@ -1890,7 +1908,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(c.coversNote!,
                     style:
-                        const TextStyle(fontSize: 12, color: Colors.white60)),
+                        TextStyle(fontSize: 12, color: kText60)),
               ),
             _CollectionRow(
               leading: const _IconSquare(
@@ -1902,7 +1920,7 @@ class _LibraryPageState extends State<LibraryPage> {
               )),
             ),
             _CollectionRow(
-              leading: const _IconSquare(
+              leading: _IconSquare(
                   Icons.library_music, [Color(0xFF1B6B3A), kGreen]),
               title: 'Tüm Şarkılar',
               subtitle: 'Kitaplık • ${countAndTotal(c.songs)}',
@@ -1949,13 +1967,13 @@ class _LibraryPageState extends State<LibraryPage> {
                 onTap: () => openPlaylist(context, p),
               ),
             if (c.songs.isEmpty && !c.loading)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(32),
                 child: Center(
                   child: Text(
                     'Henüz şarkı yok.\nSağ üstteki + ile şarkı ekle.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white60),
+                    style: TextStyle(color: kText60),
                   ),
                 ),
               ),
@@ -1987,7 +2005,7 @@ class _CollectionRow extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(subtitle,
-          style: const TextStyle(color: Colors.white60, fontSize: 13)),
+          style: TextStyle(color: kText60, fontSize: 13)),
       onTap: onTap,
     );
   }
@@ -2214,7 +2232,10 @@ class _CollectionPageState extends State<CollectionPage> {
             break;
           }
         }
-        final top = shadeTint(tint, const Color(0xFF3A2E5C));
+        final topDark = shadeTint(tint, const Color(0xFF3A2E5C));
+        final top = AppTheme.instance.isLight
+            ? Color.lerp(kBg, topDark, 0.22)!
+            : topDark;
         final playingHere = c.isPlaying && c.current != null && list.contains(c.current);
 
         // Siyahının başlıq hissəsi; mahnılar ListView.builder ilə tənbəl (lazy) qurulur
@@ -2247,7 +2268,7 @@ class _CollectionPageState extends State<CollectionPage> {
                         kind == _CollectionKind.album
                             ? albumInfo(list)
                             : countAndTotal(list),
-                        style: const TextStyle(color: Colors.white60)),
+                        style: TextStyle(color: kText60)),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -2277,14 +2298,14 @@ class _CollectionPageState extends State<CollectionPage> {
                         IconButton(
                           icon: Icon(shuffleIconFor(c),
                               size: 28,
-                              color: c.shuffleOn ? kGreen : Colors.white),
+                              color: c.shuffleOn ? kGreen : kText),
                           onPressed: () => showShuffleSheet(context),
                         ),
                         const SizedBox(width: 4),
                         Container(
                           width: 56,
                           height: 56,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: kGreen,
                             shape: BoxShape.circle,
                           ),
@@ -2345,7 +2366,7 @@ class _CollectionPageState extends State<CollectionPage> {
                               child: Text(
                                 _editing ? 'Bitti' : 'Düzenle',
                                 style: TextStyle(
-                                  color: _editing ? kGreen : Colors.white,
+                                  color: _editing ? kGreen : kText,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -2371,7 +2392,7 @@ class _CollectionPageState extends State<CollectionPage> {
                               'Bu bölümde şarkı yok.',
                           },
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white60),
+                          style: TextStyle(color: kText60),
                         ),
                       ),
                     ),
@@ -2467,7 +2488,7 @@ class _EditSongRow extends StatelessWidget {
         subtitle: Text(song.artist,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white60)),
+            style: TextStyle(color: kText60)),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2522,9 +2543,9 @@ class GroupListPage extends StatelessWidget {
                 ),
                 Expanded(
                   child: groups.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text('Henüz kayıt yok',
-                              style: TextStyle(color: Colors.white60)),
+                              style: TextStyle(color: kText60)),
                         )
                       : ListView.builder(
                           itemCount: groups.length,
@@ -2561,8 +2582,8 @@ class GroupListPage extends StatelessWidget {
                                       : countAndTotal(g.songs),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: Colors.white60, fontSize: 13)),
+                                  style: TextStyle(
+                                      color: kText60, fontSize: 13)),
                               onTap: () => Navigator.of(context)
                                   .push(MaterialPageRoute(
                                 builder: (_) => byAlbum
@@ -2597,7 +2618,7 @@ class _ActionPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white12,
+          color: kText12,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -2634,7 +2655,7 @@ Future<String?> askText(BuildContext context,
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, ctrl.text),
-          child: const Text('Tamam', style: TextStyle(color: kGreen)),
+          child: Text('Tamam', style: TextStyle(color: kGreen)),
         ),
       ],
     ),
@@ -2758,8 +2779,8 @@ void showPickPlaylistSheet(BuildContext context, Song song) {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: Colors.white12,
+              leading: CircleAvatar(
+                backgroundColor: kText12,
                 child: Icon(Icons.add),
               ),
               title: const Text('Yeni çalma listesi'),
@@ -2839,8 +2860,8 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                           picked.length == candidates.length
                               ? 'Seçimi kaldır'
                               : 'Tümünü seç',
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: kText, fontWeight: FontWeight.bold),
                         ),
                       ),
                     TextButton(
@@ -2852,19 +2873,19 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                             },
                       child: Text('Ekle (${picked.length})',
                           style: TextStyle(
-                              color: picked.isEmpty ? Colors.white30 : kGreen,
+                              color: picked.isEmpty ? kText30 : kGreen,
                               fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
               ),
               if (candidates.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(32),
                   child: Text(
                     'Eklenecek şarkı kalmadı.\nÖnce Kitaplığından şarkı yükle.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white60),
+                    style: TextStyle(color: kText60),
                   ),
                 )
               else
@@ -3044,13 +3065,13 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
                         TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                     'Bir sonuca dokun: sözü bu şarkıya eklenir. Aranan metin lrclib.net\'e gönderilir.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    style: TextStyle(color: kText54, fontSize: 12)),
               ),
             ),
             Padding(
@@ -3070,15 +3091,15 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: kGreen))
+                  ? Center(child: CircularProgressIndicator(color: kGreen))
                   : _error != null
                       ? Center(
                           child: Text(_error!,
-                              style: const TextStyle(color: Colors.white60)))
+                              style: TextStyle(color: kText60)))
                       : (_searched && _results.isEmpty)
-                          ? const Center(
+                          ? Center(
                               child: Text('Sonuç yok, aramayı değiştir',
-                                  style: TextStyle(color: Colors.white60)))
+                                  style: TextStyle(color: kText60)))
                           : ListView.builder(
                               itemCount: _results.length,
                               itemBuilder: (_, i) {
@@ -3100,8 +3121,8 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
                                       first.isEmpty ? info : '$info\n$first',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          color: Colors.white60)),
+                                      style: TextStyle(
+                                          color: kText60)),
                                   onTap: () => Navigator.pop(context, r),
                                 );
                               },
@@ -3125,7 +3146,7 @@ Future<void> pickLyricsFor(BuildContext context, Song song) async {
 void openLyricsPage(BuildContext context) {
   Navigator.of(context).push(MaterialPageRoute(
     fullscreenDialog: true,
-    builder: (_) => const LyricsPage(),
+    builder: (_) => const DarkZone(child: LyricsPage()),
   ));
 }
 
@@ -3682,7 +3703,7 @@ class _EditSongPageState extends State<EditSongPage> {
         actions: [
           TextButton(
             onPressed: _busy ? null : _save,
-            child: const Text('Kaydet',
+            child: Text('Kaydet',
                 style: TextStyle(color: kGreen, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -3698,7 +3719,7 @@ class _EditSongPageState extends State<EditSongPage> {
                 children: [
                   Cover(size: 180, bytes: _cover),
                   if (_busy)
-                    const CircularProgressIndicator(color: kGreen),
+                    CircularProgressIndicator(color: kGreen),
                 ],
               ),
             ),
@@ -3859,13 +3880,13 @@ class _CandidateSheetState extends State<_CandidateSheet> {
                         TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                     'Bir sonuca dokun: ad, sanatçı, albüm ve kapak doldurulur.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    style: TextStyle(color: kText54, fontSize: 12)),
               ),
             ),
             Padding(
@@ -3885,15 +3906,15 @@ class _CandidateSheetState extends State<_CandidateSheet> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: kGreen))
+                  ? Center(child: CircularProgressIndicator(color: kGreen))
                   : _error != null
                       ? Center(
                           child: Text(_error!,
-                              style: const TextStyle(color: Colors.white60)))
+                              style: TextStyle(color: kText60)))
                       : (_searched && _results.isEmpty)
-                          ? const Center(
+                          ? Center(
                               child: Text('Sonuç yok, aramayı değiştir',
-                                  style: TextStyle(color: Colors.white60)))
+                                  style: TextStyle(color: kText60)))
                           : ListView.builder(
                               itemCount: _results.length,
                               itemBuilder: (_, i) {
@@ -3923,8 +3944,8 @@ class _CandidateSheetState extends State<_CandidateSheet> {
                                           : '${r.artist} • ${r.album}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          color: Colors.white60)),
+                                      style: TextStyle(
+                                          color: kText60)),
                                   onTap: () => Navigator.pop(context, r),
                                 );
                               },

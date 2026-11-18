@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart'
     show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:just_audio/just_audio.dart';
 
+import 'app_theme.dart' show AppTheme;
 import 'audio_route_io.dart' if (dart.library.js_interop) 'audio_route_web.dart';
 import 'audio_url_stub.dart' if (dart.library.js_interop) 'audio_url_web.dart';
 import 'cover_lookup.dart';
@@ -184,6 +185,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         dynamicBg = st.dynamicBg;
         unawaited(player.setSpeed(speed));
       }
+      final th = await CloudioStore.instance.loadTheme();
+      if (th != null) AppTheme.instance.restore(th.mode, th.accent);
       final pr = await CloudioStore.instance.loadProfile();
       if (pr != null) {
         profileName = pr.name;

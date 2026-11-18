@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'main.dart' show kBg, kCard, kGreen;
+import 'app_theme.dart' show DarkZone;
+import 'main.dart' show kCard, kGreen, kText, kText12, kText38, kText54, kText60, kText70;
 import 'persistence.dart' show PlayEvent;
 import 'player_controller.dart';
 
@@ -203,7 +204,7 @@ class _StatsPageState extends State<StatsPage> {
                     'Qeyd: yeniləmədən əvvəlki ${c.untrackedPlays} dinləmənin tarixi '
                     'bilinmir, ona görə yalnız "Hamısı" bölməsində sayılır.',
                     style:
-                        const TextStyle(color: Colors.white38, fontSize: 11)),
+                        TextStyle(color: kText38, fontSize: 11)),
               ],
               const _Gap(),
               _ActivityCard(log: c.playLog),
@@ -240,7 +241,7 @@ class _RangeChip extends StatelessWidget {
         ),
         child: Text(label,
             style: TextStyle(
-                color: selected ? Colors.black : Colors.white,
+                color: selected ? Colors.black : kText,
                 fontWeight: FontWeight.w600)),
       ),
     );
@@ -256,7 +257,7 @@ class _Empty extends StatelessWidget {
         child: Center(
           child: Text(text,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60)),
+              style: TextStyle(color: kText60)),
         ),
       );
 }
@@ -284,7 +285,8 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DarkZone(
+        child: Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -292,7 +294,7 @@ class _HeroCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0B5D2A), kBg],
+          colors: [Color(0xFF0B5D2A), Color(0xFF121212)],
         ),
         border: Border.all(color: kGreen.withValues(alpha: 0.35)),
       ),
@@ -303,7 +305,7 @@ class _HeroCard extends StatelessWidget {
               style: const TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 6),
           Text(data.ms > 0 ? _dur(Duration(milliseconds: data.ms)) : '—',
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 36, fontWeight: FontWeight.bold, color: kGreen)),
           const SizedBox(height: 14),
           Row(
@@ -315,7 +317,7 @@ class _HeroCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -332,7 +334,7 @@ class _MiniStat extends StatelessWidget {
                 style:
                     const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             Text(label,
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54), fontSize: 12)),
           ],
         ),
       );
@@ -367,7 +369,7 @@ class _TopArtistCard extends StatelessWidget {
               children: [
                 Text(title,
                     style:
-                        const TextStyle(color: Colors.white60, fontSize: 12)),
+                        TextStyle(color: kText60, fontSize: 12)),
                 const SizedBox(height: 4),
                 Text(artist.name,
                     maxLines: 2,
@@ -377,7 +379,7 @@ class _TopArtistCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text('${artist.count} dinləmə • dinləmələrin $share%-i',
                     style:
-                        const TextStyle(color: Colors.white70, fontSize: 13)),
+                        TextStyle(color: kText70, fontSize: 13)),
               ],
             ),
           ),
@@ -422,7 +424,7 @@ class _RankCard extends StatelessWidget {
                         width: 22,
                         child: Text('${i + 1}',
                             style: TextStyle(
-                                color: i == 0 ? kGreen : Colors.white54,
+                                color: i == 0 ? kGreen : kText54,
                                 fontWeight: FontWeight.bold)),
                       ),
                       Expanded(
@@ -435,8 +437,8 @@ class _RankCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text('${items[i].count} $unit',
-                          style: const TextStyle(
-                              color: Colors.white60, fontSize: 12)),
+                          style: TextStyle(
+                              color: kText60, fontSize: 12)),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -445,9 +447,9 @@ class _RankCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: items[i].count / maxCount,
                       minHeight: 5,
-                      backgroundColor: Colors.white12,
+                      backgroundColor: kText12,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                          i == 0 ? kGreen : Colors.white38),
+                          i == 0 ? kGreen : kText38),
                     ),
                   ),
                 ],
@@ -518,8 +520,8 @@ class _ActivityCard extends StatelessWidget {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
           if (maxC == 0)
-            const Text('Son 14 gündə dinləmə yoxdur.',
-                style: TextStyle(color: Colors.white54, fontSize: 13))
+            Text('Son 14 gündə dinləmə yoxdur.',
+                style: TextStyle(color: kText54, fontSize: 13))
           else
             SizedBox(
               height: 96,
@@ -539,7 +541,7 @@ class _ActivityCard extends StatelessWidget {
                                   : 4 + 56 * counts[i] / maxC,
                               decoration: BoxDecoration(
                                 color: counts[i] == 0
-                                    ? Colors.white12
+                                    ? kText12
                                     : (i == days.length - 1
                                         ? kGreen
                                         : kGreen.withValues(alpha: 0.6)),
@@ -552,7 +554,7 @@ class _ActivityCard extends StatelessWidget {
                                     fontSize: 9,
                                     color: i == days.length - 1
                                         ? kGreen
-                                        : Colors.white38)),
+                                        : kText38)),
                           ],
                         ),
                       ),

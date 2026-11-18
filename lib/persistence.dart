@@ -529,6 +529,32 @@ class CloudioStore {
     }
   }
 
+  // ---- tema (rejim + vurğu rəngi) ----
+  Future<void> saveTheme(int mode, int accent) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta
+          .record('theme')
+          .put(db, <String, Object?>{'mode': mode, 'accent': accent});
+    } catch (e) {
+      debugPrint('[Cloudio DB] tema yazıla bilmədi: $e');
+    }
+  }
+
+  Future<({int mode, int accent})?> loadTheme() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('theme').get(db);
+      if (m == null) return null;
+      return (mode: m['mode'] as int? ?? 0, accent: m['accent'] as int? ?? 0);
+    } catch (e) {
+      debugPrint('[Cloudio DB] tema oxunmadı: $e');
+      return null;
+    }
+  }
+
   // ---- yerli profil (ad, rəng, yaradılma tarixi) ----
   Future<void> saveProfile({
     required String name,
