@@ -55,14 +55,17 @@ class CloudioAudioHandler extends BaseAudioHandler {
 
   void _broadcast() {
     final p = _c.player;
+    // Sıranın sonunda "ileri" düyməsi kilid ekranında göstərilmir
+    final controls = [
+      MediaControl.skipToPrevious,
+      if (p.playing) MediaControl.pause else MediaControl.play,
+      if (_c.hasNext) MediaControl.skipToNext,
+    ];
     playbackState.add(PlaybackState(
-      controls: [
-        MediaControl.skipToPrevious,
-        if (p.playing) MediaControl.pause else MediaControl.play,
-        MediaControl.skipToNext,
-      ],
+      controls: controls,
       systemActions: const {MediaAction.seek},
-      androidCompactActionIndices: const [0, 1, 2],
+      androidCompactActionIndices:
+          List<int>.generate(controls.length, (i) => i),
       processingState: _map(p.processingState),
       playing: p.playing,
       updatePosition: p.position,
@@ -78,7 +81,14 @@ class CloudioAudioHandler extends BaseAudioHandler {
   String _artist = '';
   String _album = '';
 
+  bool _hadNext = true;
+
   void _onController() {
+    final hn = _c.hasNext;
+    if (hn != _hadNext) {
+      _hadNext = hn;
+      _broadcast(); // "ileri" düyməsi göstərilməli / gizlədilməli
+    }
     final s = _c.current;
     if (s == null) {
       if (_song != null) {

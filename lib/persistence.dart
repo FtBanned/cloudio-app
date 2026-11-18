@@ -301,6 +301,30 @@ class CloudioStore {
     }
   }
 
+  // ---- kitaplıqda əl ilə sıralama (sürüklə-burax) ----
+  Future<void> saveLibraryOrder(List<String> ids) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('libOrder').put(db, <String, Object?>{'ids': ids});
+    } catch (e) {
+      debugPrint('[Cloudio DB] kitaplıq sırası yazıla bilmədi: $e');
+    }
+  }
+
+  Future<List<String>?> loadLibraryOrder() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('libOrder').get(db);
+      if (m == null) return null;
+      return [for (final id in (m['ids'] as List? ?? const [])) id as String];
+    } catch (e) {
+      debugPrint('[Cloudio DB] kitaplıq sırası oxunmadı: $e');
+      return null;
+    }
+  }
+
   // ---- son çalma vəziyyəti ----
   Future<void> saveQueue(SavedQueue q) async {
     final db = _db;

@@ -174,6 +174,56 @@ Future<Lyrics?> fetchLyricsOnline({
   return null;
 }
 
+/// Əl ilə axtarışda siyahıda göstərilən bir LRCLIB nəticəsi.
+class LyricsCandidate {
+  final String title;
+  final String artist;
+  final String album;
+  final Duration? duration;
+  final Lyrics lyrics;
+  const LyricsCandidate({
+    required this.title,
+    required this.artist,
+    required this.album,
+    required this.duration,
+    required this.lyrics,
+  });
+}
+
+/// Serbest metinlə LRCLIB-də söz axtarır (ən çox 30 nəticə). Ağ xətasında istisna atır.
+Future<List<LyricsCandidate>> searchLyricsCandidates(String query) async {
+  final q = query.trim();
+  if (q.isEmpty) return const [];
+  final res = await http
+      .get(Uri.https('lrclib.net', '/api/search', {'q': q}))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
+  final list = jsonDecode(utf8.decode(res.bodyBytes));
+  if (list is! List) return const [];
+  final out = <LyricsCandidate>[];
+  for (final item in list) {
+    if (item is! Map) continue;
+    if (item['instrumental'] == true) continue;
+    final synced = (item['syncedLyrics'] as String?)?.trim() ?? '';
+    final plain = (item['plainLyrics'] as String?)?.trim() ?? '';
+    final parsed =
+        Lyrics.parse(synced.isNotEmpty ? synced : plain, source: 'LRCLIB');
+    if (parsed == null) continue;
+    final d = item['duration'];
+    out.add(LyricsCandidate(
+      title: (item['trackName'] as String?) ?? (item['name'] as String?) ?? '',
+      artist: (item['artistName'] as String?) ?? '',
+      album: (item['albumName'] as String?) ?? '',
+      duration: (d is num && d > 0)
+          ? Duration(milliseconds: (d * 1000).round())
+          : null,
+      lyrics: parsed,
+    ));
+    if (out.length >= 30) break;
+  }
+  return out;
+}
+
 Lyrics? _pickBest(List list, Duration? duration) {
   Lyrics? bestLyrics;
   var bestScore = double.infinity;

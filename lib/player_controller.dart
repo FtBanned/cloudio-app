@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart'
     show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:just_audio/just_audio.dart';
 
+import 'audio_route_io.dart' if (dart.library.js_interop) 'audio_route_web.dart';
 import 'audio_url_stub.dart' if (dart.library.js_interop) 'audio_url_web.dart';
 import 'cover_lookup.dart';
 import 'cover_tint.dart';
@@ -89,7 +90,51 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   PlayerController._() {
     WidgetsBinding.instance.addObserver(this);
     _bind(player);
+    unawaited(_route.start()); // qulaqlıq çıxanda dayan, taxılanda davam et
     unawaited(_restore()); // əvvəl saxlanmış kitabxananı yüklə
+  }
+
+  // ---- qulaqlıq çıxanda avto-pauza, taxılanda avto-davam ----
+  late final AudioRouteWatcher _route =
+      AudioRouteWatcher(onRemoved: _onRouteRemoved, onAdded: _onRouteAdded);
+  bool _autoPausedByRoute = false; // qulaqlıq çıxdığı üçün dayanıb
+  bool _userPaused = false; // istifadəçi / sleep timer / siyahı sonu dayandırıb
+  bool _wasPlaying = false;
+  DateTime? _stoppedAt; // çalma ən son nə vaxt dayandı
+
+  /// Aktiv pleyerin vəziyyəti dəyişəndə çağırılır: çalma nə vaxt dayandığını izləyir.
+  void _trackPlaying(bool playing) {
+    if (playing) {
+      _wasPlaying = true;
+      _userPaused = false;
+      _autoPausedByRoute = false;
+    } else if (_wasPlaying) {
+      _wasPlaying = false;
+      _stoppedAt = DateTime.now();
+    }
+  }
+
+  void _onRouteRemoved() {
+    // iOS qulaqlıq çıxanda pleyeri özü dayandıra bilir, ona görə "az əvvəl dayandı" da sayılır
+    final st = _stoppedAt;
+    final justStopped = st != null &&
+        DateTime.now().difference(st) < const Duration(seconds: 2) &&
+        !_userPaused &&
+        player.processingState != ProcessingState.completed;
+    if (!player.playing && !justStopped) return;
+    _autoPausedByRoute = true;
+    if (player.playing) {
+      _cancelFade();
+      unawaited(player.pause());
+    }
+  }
+
+  Future<void> _onRouteAdded() async {
+    if (!_autoPausedByRoute) return;
+    _autoPausedByRoute = false;
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (_userPaused || player.playing || current == null) return;
+    play();
   }
 
   static final PlayerController instance = PlayerController._();
@@ -173,6 +218,22 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
           playlists.add(pl);
         }
         _seq = songs.fold<int>(0, (m, s) => max(m, s.seq));
+        // Əl ilə saxlanmış kitaplıq sırası (yeni əlavə olunanlar sona düşür)
+        final savedOrder = await CloudioStore.instance.loadLibraryOrder();
+        if (savedOrder != null && savedOrder.isNotEmpty) {
+          final seen = <Song>{};
+          final ordered = <Song>[];
+          for (final id in savedOrder) {
+            final s = byId[id];
+            if (s != null && seen.add(s)) ordered.add(s);
+          }
+          for (final s in songs) {
+            if (seen.add(s)) ordered.add(s);
+          }
+          songs
+            ..clear()
+            ..addAll(ordered);
+        }
         // Arama algoritması yenilendi: eskiden "bulunamadı" işaretlenenler yeniden denensin
         if (_coverVersion < kCoverSearchVersion) {
           for (final s in songs) {
@@ -222,6 +283,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       ..clear()
       ..addAll([
         p.playerStateStream.listen((_) {
+          if (!_fading) _trackPlaying(p.playing);
           // pauza: mövqeyi dərhal saxla (mahnı yüklənərkən köhnə mövqe yazılmasın)
           if (!_fading &&
               !p.playing &&
@@ -843,6 +905,14 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// İnternetdə əl ilə seçilmiş sözü mahnıya bağlayır (varsa əvvəlkinin yerinə keçir).
+  void setLyrics(Song s, Lyrics l) {
+    s.lyrics = l;
+    s.lyricsStatus = LyricsStatus.found;
+    unawaited(_saveSong(s));
+    notifyListeners();
+  }
+
   void clearLyrics(Song s) {
     s.lyrics = null;
     s.lyricsStatus = LyricsStatus.notFound; // kullanıcı kaldırdı: kendiliğinden tekrar aranmasın
@@ -898,6 +968,20 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     final s = p.songs.removeAt(oldIndex);
     p.songs.insert(target, s);
     _savePlaylists();
+    notifyListeners();
+  }
+
+  /// Kitaplıqda (Tüm Şarkılar) mahnının yerini dəyişir. [newIndex] artıq düzəldilmiş
+  /// indeksdir. Hazırda çalan növbəyə toxunmur.
+  void reorderLibrary(int oldIndex, int newIndex) {
+    final n = songs.length;
+    if (oldIndex < 0 || oldIndex >= n || n < 2) return;
+    final target = newIndex.clamp(0, n - 1);
+    if (target == oldIndex) return;
+    final s = songs.removeAt(oldIndex);
+    songs.insert(target, s);
+    unawaited(CloudioStore.instance
+        .saveLibraryOrder([for (final x in songs) x.id]));
     notifyListeners();
   }
 
@@ -1103,6 +1187,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   void play() => unawaited(player.play());
 
   Future<void> pause() async {
+    _userPaused = true;
+    _autoPausedByRoute = false;
     _cancelFade();
     await player.pause();
   }
@@ -1243,8 +1329,22 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// "İleri" mümkündürmü: sıranın / qarışıq sıranın sonunda və təkrar "hamısı" deyilsə
+  /// sonrakı mahnı yoxdur (düymə söndürülür, kilid ekranından da gizlənir).
+  bool get hasNext {
+    if (_queue.isEmpty) return false;
+    if (repeatKind == RepeatKind.all) return true;
+    final cur = currentIndex;
+    if (cur == null) return true;
+    if (_shuffleActive) {
+      if (_order.length != _queue.length) return true;
+      return _pos + 1 < _order.length;
+    }
+    return cur + 1 < _queue.length;
+  }
+
   Future<void> next() async {
-    if (_queue.isEmpty) return;
+    if (_queue.isEmpty || !hasNext) return;
     if (_shuffleActive) {
       if (_order.length != _queue.length) _buildShuffle(first: currentIndex);
       if (_pos + 1 < _order.length) {
@@ -1366,6 +1466,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _onCompleted() async {
     if (sleepAtSongEnd) {
       sleepAtSongEnd = false;
+      _userPaused = true;
       await player.pause();
       await player.seek(Duration.zero);
       notifyListeners();
@@ -1382,6 +1483,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         ? _pos >= _order.length - 1
         : currentIndex == _queue.length - 1;
     if (isLast && repeatKind == RepeatKind.off) {
+      _userPaused = true;
       await player.pause();
       await player.seek(Duration.zero);
       return;

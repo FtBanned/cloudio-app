@@ -937,7 +937,7 @@ class NowPlayingPage extends StatelessWidget {
                         IconButton(
                           iconSize: 40,
                           icon: const Icon(Icons.skip_next),
-                          onPressed: c.next,
+                          onPressed: c.hasNext ? c.next : null,
                         ),
                         IconButton(
                           icon: Icon(
@@ -2015,7 +2015,8 @@ class _CollectionPageState extends State<CollectionPage> {
                                   },
                                 ),
                         ),
-                        if (kind == _CollectionKind.playlist)
+                        if (kind == _CollectionKind.playlist ||
+                            kind == _CollectionKind.all)
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: TextButton(
@@ -2058,6 +2059,9 @@ class _CollectionPageState extends State<CollectionPage> {
                     ),
         ];
 
+        // Düzenle rejimində sürüklənən siyahı: çalma listəsi ya da bütün kitaplıq
+        final editSongs = pl?.songs ?? c.songs;
+
         return Scaffold(
           bottomNavigationBar: const MiniPlayer(),
           body: AnimatedContainer(
@@ -2071,14 +2075,16 @@ class _CollectionPageState extends State<CollectionPage> {
               ),
             ),
             child: SafeArea(
-              child: (_editing && pl != null)
+              child: (_editing &&
+                      (pl != null || kind == _CollectionKind.all))
                   ? CustomScrollView(
                       slivers: [
                         SliverList(delegate: SliverChildListDelegate(header)),
                         SliverReorderableList(
-                          itemCount: pl.songs.length,
-                          onReorderItem: (oldI, newI) =>
-                              c.reorderPlaylist(pl, oldI, newI),
+                          itemCount: editSongs.length,
+                          onReorderItem: (oldI, newI) => pl != null
+                              ? c.reorderPlaylist(pl, oldI, newI)
+                              : c.reorderLibrary(oldI, newI),
                           proxyDecorator: (child, index, animation) => Material(
                             color: kCard,
                             elevation: 6,
@@ -2086,12 +2092,14 @@ class _CollectionPageState extends State<CollectionPage> {
                             child: child,
                           ),
                           itemBuilder: (context, i) {
-                            final s = pl.songs[i];
+                            final s = editSongs[i];
                             return _EditSongRow(
                               key: ValueKey(s.id),
                               song: s,
                               index: i,
-                              onRemove: () => c.removeFromPlaylist(pl, s),
+                              onRemove: pl == null
+                                  ? null
+                                  : () => c.removeFromPlaylist(pl, s),
                             );
                           },
                         ),
@@ -2123,12 +2131,12 @@ class _CollectionPageState extends State<CollectionPage> {
 class _EditSongRow extends StatelessWidget {
   final Song song;
   final int index;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove; // null: kitaplıqda çıxarma düyməsi yok
   const _EditSongRow({
     super.key,
     required this.song,
     required this.index,
-    required this.onRemove,
+    this.onRemove,
   });
 
   @override
@@ -2145,11 +2153,12 @@ class _EditSongRow extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              tooltip: 'Bu listeden çıkar',
-              icon: const Icon(Icons.remove_circle_outline),
-              onPressed: onRemove,
-            ),
+            if (onRemove != null)
+              IconButton(
+                tooltip: 'Bu listeden çıkar',
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed: onRemove,
+              ),
             ReorderableDragStartListener(
               index: index,
               child: const Padding(
@@ -2378,6 +2387,15 @@ void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
               pickLyricsFor(context, song);
             },
           ),
+          if (kOnlineLyrics)
+            ListTile(
+              leading: const Icon(Icons.manage_search),
+              title: const Text('Şarkı sözünü internette ara'),
+              onTap: () {
+                Navigator.pop(ctx);
+                showLyricsSearch(context, song);
+              },
+            ),
           if (playlist != null)
             ListTile(
               leading: const Icon(Icons.remove_circle_outline),
@@ -2490,6 +2508,23 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                           style: TextStyle(
                               fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
+                    if (candidates.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setSt(() {
+                          if (picked.length == candidates.length) {
+                            picked.clear();
+                          } else {
+                            picked.addAll(candidates);
+                          }
+                        }),
+                        child: Text(
+                          picked.length == candidates.length
+                              ? 'Seçimi kaldır'
+                              : 'Tümünü seç',
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     TextButton(
                       onPressed: picked.isEmpty
                           ? null
@@ -2592,6 +2627,173 @@ Color lyricsBg(Color? tint) {
       .withLightness(0.34)
       .withSaturation(h.saturation.clamp(0.25, 0.7).toDouble())
       .toColor();
+}
+
+/// Serbest metinlə internette söz axtarır, siyahıdan seçilən sözü mahnıya bağlayır.
+Future<void> showLyricsSearch(BuildContext context, Song song) async {
+  final initial = cleanForSearch(song.artist == kUnknownArtist
+      ? song.title
+      : '${song.artist} ${song.title}');
+  final picked = await showModalBottomSheet<LyricsCandidate>(
+    context: context,
+    backgroundColor: kCard,
+    shape: _sheetShape,
+    isScrollControlled: true,
+    builder: (_) => _LyricsSearchSheet(initial: initial),
+  );
+  if (picked == null || !context.mounted) return;
+  PlayerController.instance.setLyrics(song, picked.lyrics);
+  ScaffoldMessenger.of(context)
+      .showSnackBar(const SnackBar(content: Text('Şarkı sözü eklendi')));
+}
+
+class _LyricsSearchSheet extends StatefulWidget {
+  final String initial;
+  const _LyricsSearchSheet({required this.initial});
+
+  @override
+  State<_LyricsSearchSheet> createState() => _LyricsSearchSheetState();
+}
+
+class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
+  late final TextEditingController _q;
+  List<LyricsCandidate> _results = const [];
+  bool _loading = false;
+  bool _searched = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _q = TextEditingController(text: widget.initial);
+    if (widget.initial.trim().isNotEmpty) _search();
+  }
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final q = _q.text.trim();
+    if (q.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final r = await searchLyricsCandidates(q);
+      if (!mounted) return;
+      setState(() {
+        _results = r;
+        _searched = true;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Arama yapılamadı, bağlantını kontrol et';
+        _loading = false;
+      });
+    }
+  }
+
+  /// Sözün ilk dolu sətri: doğru mahnı olub-olmadığını anlamaq üçün.
+  String _firstLine(Lyrics l) {
+    for (final line in l.lines) {
+      if (line.text.trim().isNotEmpty) return line.text.trim();
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: h * 0.8,
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Şarkı sözü ara',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                    'Bir sonuca dokun: sözü bu şarkıya eklenir. Aranan metin lrclib.net\'e gönderilir.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: TextField(
+                controller: _q,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _search(),
+                decoration: InputDecoration(
+                  hintText: 'Sanatçı ve şarkı adı veya bir söz satırı',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _search,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: kGreen))
+                  : _error != null
+                      ? Center(
+                          child: Text(_error!,
+                              style: const TextStyle(color: Colors.white60)))
+                      : (_searched && _results.isEmpty)
+                          ? const Center(
+                              child: Text('Sonuç yok, aramayı değiştir',
+                                  style: TextStyle(color: Colors.white60)))
+                          : ListView.builder(
+                              itemCount: _results.length,
+                              itemBuilder: (_, i) {
+                                final r = _results[i];
+                                final info = [
+                                  if (r.artist.isNotEmpty) r.artist,
+                                  if (r.album.isNotEmpty) r.album,
+                                  if (r.duration != null)
+                                    formatDuration(r.duration!),
+                                  r.lyrics.synced ? 'Senkron' : 'Düz metin',
+                                ].join(' • ');
+                                final first = _firstLine(r.lyrics);
+                                return ListTile(
+                                  isThreeLine: first.isNotEmpty,
+                                  title: Text(r.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  subtitle: Text(
+                                      first.isEmpty ? info : '$info\n$first',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: Colors.white60)),
+                                  onTap: () => Navigator.pop(context, r),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> pickLyricsFor(BuildContext context, Song song) async {
@@ -2706,6 +2908,16 @@ void showLyricsMenu(BuildContext context, Song song) {
                 c.loadLyricsOnline(song, force: true);
               },
             ),
+          if (kOnlineLyrics)
+            ListTile(
+              leading: const Icon(Icons.manage_search),
+              title: const Text('Elle ara ve seç'),
+              subtitle: const Text('Sonuç listesinden doğru sözü sen seç'),
+              onTap: () {
+                Navigator.pop(ctx);
+                showLyricsSearch(context, song);
+              },
+            ),
           if (song.lyrics != null)
             ListTile(
               leading: const Icon(Icons.delete_outline),
@@ -2806,6 +3018,12 @@ class _LyricsEmpty extends StatelessWidget {
                   style: TextButton.styleFrom(foregroundColor: Colors.white),
                   onPressed: () => c.loadLyricsOnline(song, force: true),
                   child: Text(error ? 'Tekrar dene' : 'İnternetten ara'),
+                ),
+              if (kOnlineLyrics)
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  onPressed: () => showLyricsSearch(context, song),
+                  child: const Text('Elle ara'),
                 ),
               TextButton(
                 style: TextButton.styleFrom(foregroundColor: Colors.white),
@@ -3008,7 +3226,7 @@ class LyricsPage extends StatelessWidget {
                       IconButton(
                         iconSize: 36,
                         icon: const Icon(Icons.skip_next),
-                        onPressed: c.next,
+                        onPressed: c.hasNext ? c.next : null,
                       ),
                     ],
                   ),
