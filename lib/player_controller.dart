@@ -170,6 +170,19 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         crossfadeSecs = kIsWeb ? 0 : st.crossfade;
         normalizeOn = st.normalize;
         _coverVersion = st.coverVersion;
+        speed = st.speed;
+        dynamicBg = st.dynamicBg;
+        unawaited(player.setSpeed(speed));
+      }
+      final pr = await CloudioStore.instance.loadProfile();
+      if (pr != null) {
+        profileName = pr.name;
+        profileColor = pr.color;
+        profileSince = DateTime.fromMillisecondsSinceEpoch(
+            pr.sinceMs > 0 ? pr.sinceMs : DateTime.now().millisecondsSinceEpoch);
+      } else {
+        profileSince = DateTime.now(); // ilk açılış: hesab indi yaradılır
+        _saveProfile();
       }
       final lib = await CloudioStore.instance.loadAll();
       if (lib != null) {
@@ -562,7 +575,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   void _saveSettings() => unawaited(CloudioStore.instance.saveSettings(
       crossfade: crossfadeSecs,
       normalize: normalizeOn,
-      coverVersion: _coverVersion));
+      coverVersion: _coverVersion,
+      speed: speed,
+      dynamicBg: dynamicBg));
 
   // ---- crossfade / boşluksuz keçid ----
   // İkinci pleyer sıradakı mahnını əvvəlcədən yükləyir; sonda iki pleyerin səsi
@@ -576,6 +591,74 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   AudioPlayer? _fadeOld; // səsi azalan köhnə pleyer
   Song? _preSong; // ikinci pleyerdə hazır gözləyən mahnı
   bool _preloading = false;
+
+  // ---- yerli profil ("Admin" hesabı: bu cihazda, giriş tələb etmir) ----
+  String profileName = 'Admin';
+  int profileColor = 0; // settings_page.dart-dakı kProfileColors indeksi
+  DateTime profileSince = DateTime.now();
+
+  void _saveProfile() => unawaited(CloudioStore.instance.saveProfile(
+      name: profileName,
+      color: profileColor,
+      sinceMs: profileSince.millisecondsSinceEpoch));
+
+  void setProfile({required String name, required int color}) {
+    final n = name.trim();
+    profileName = n.isEmpty ? 'Admin' : n;
+    profileColor = color;
+    _saveProfile();
+    notifyListeners();
+  }
+
+  /// Bütün mahnıların cəmi dinləmə sayı.
+  int get totalPlays => songs.fold(0, (a, s) => a + s.playCount);
+
+  /// Təxmini dinləmə vaxtı: hər mahnının müddəti x dinləmə sayı.
+  Duration get listenedTime {
+    var ms = 0;
+    for (final s in songs) {
+      ms += (s.duration?.inMilliseconds ?? 0) * s.playCount;
+    }
+    return Duration(milliseconds: ms);
+  }
+
+  /// Ən çox dinlənən sənətçi (yoxdursa null) və onun dinləmə sayı.
+  (String, int)? get topArtist {
+    final m = <String, int>{};
+    for (final s in songs) {
+      if (s.playCount > 0 && s.artist.trim().isNotEmpty && s.artist != kUnknownArtist) {
+        m[s.artist] = (m[s.artist] ?? 0) + s.playCount;
+      }
+    }
+    if (m.isEmpty) return null;
+    final e = m.entries.reduce((a, b) => a.value >= b.value ? a : b);
+    return (e.key, e.value);
+  }
+
+  // ---- görünüş ----
+  bool dynamicBg = true; // Now Playing fonu kapağın rənglərindən qurulsun
+
+  void setDynamicBg(bool v) {
+    dynamicBg = v;
+    _saveSettings();
+    notifyListeners();
+  }
+
+  // ---- çalma sürəti ----
+  static const speedOptions = <double>[0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  double speed = 1.0;
+
+  /// Çalma sürəti (0.5x–2x). Hər iki pleyerə tətbiq olunur ki, crossfade zamanı da eyni qalsın.
+  void setSpeed(double v) {
+    speed = v.clamp(0.5, 2.0).toDouble();
+    unawaited(player.setSpeed(speed));
+    final sp = _spare;
+    if (sp != null) unawaited(sp.setSpeed(speed));
+    _crossTimer?.cancel(); // keçid vaxtı sürətə görə yenidən hesablansın
+    _crossTimer = null;
+    _saveSettings();
+    notifyListeners();
+  }
 
   void setCrossfade(double secs) {
     crossfadeSecs = kIsWeb ? 0 : secs;
@@ -618,8 +701,10 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (rem <= fadeMs + 10000 && !identical(_preSong, next)) {
       unawaited(_preload(next));
     }
-    if (rem <= fadeMs + 1000 && identical(_preSong, next)) {
-      _crossTimer = Timer(Duration(milliseconds: max(0, rem - fadeMs)), () {
+    // rem mahnı vaxtıdır; sürət 1x deyilsə real gözləmə müddəti rem / speed olur
+    if (rem <= fadeMs * speed + 1000 && identical(_preSong, next)) {
+      final waitMs = max(0, (rem / speed).round() - fadeMs);
+      _crossTimer = Timer(Duration(milliseconds: waitMs), () {
         _crossTimer = null;
         unawaited(_doCrossfade(fadeMs));
       });
@@ -633,6 +718,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     try {
       final sp = _spare ??= AudioPlayer();
       await sp.setVolume(0);
+      await sp.setSpeed(speed);
       await sp.setFilePath(path);
       _preSong = s;
     } catch (e) {

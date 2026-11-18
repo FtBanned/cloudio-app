@@ -397,6 +397,8 @@ class CloudioStore {
     required double crossfade,
     required bool normalize,
     int coverVersion = 0,
+    double speed = 1.0,
+    bool dynamicBg = true,
   }) async {
     final db = _db;
     if (db == null) return;
@@ -405,13 +407,16 @@ class CloudioStore {
         'crossfade': crossfade,
         'normalize': normalize,
         'coverV': coverVersion,
+        'speed': speed,
+        'dynBg': dynamicBg,
       });
     } catch (e) {
       debugPrint('[Cloudio DB] ayarlar yazıla bilmədi: $e');
     }
   }
 
-  Future<({double crossfade, bool normalize, int coverVersion})?> loadSettings() async {
+  Future<({double crossfade, bool normalize, int coverVersion, double speed, bool dynamicBg})?>
+      loadSettings() async {
     final db = _db;
     if (db == null) return null;
     try {
@@ -421,9 +426,47 @@ class CloudioStore {
         crossfade: (m['crossfade'] as num?)?.toDouble() ?? 0.0,
         normalize: m['normalize'] as bool? ?? false,
         coverVersion: m['coverV'] as int? ?? 0,
+        speed: (m['speed'] as num?)?.toDouble() ?? 1.0,
+        dynamicBg: m['dynBg'] as bool? ?? true,
       );
     } catch (e) {
       debugPrint('[Cloudio DB] ayarlar oxunmadı: $e');
+      return null;
+    }
+  }
+
+  // ---- yerli profil (ad, rəng, yaradılma tarixi) ----
+  Future<void> saveProfile({
+    required String name,
+    required int color,
+    required int sinceMs,
+  }) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('profile').put(db, <String, Object?>{
+        'name': name,
+        'color': color,
+        'since': sinceMs,
+      });
+    } catch (e) {
+      debugPrint('[Cloudio DB] profil yazıla bilmədi: $e');
+    }
+  }
+
+  Future<({String name, int color, int sinceMs})?> loadProfile() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('profile').get(db);
+      if (m == null) return null;
+      return (
+        name: m['name'] as String? ?? 'Admin',
+        color: m['color'] as int? ?? 0,
+        sinceMs: m['since'] as int? ?? 0,
+      );
+    } catch (e) {
+      debugPrint('[Cloudio DB] profil oxunmadı: $e');
       return null;
     }
   }

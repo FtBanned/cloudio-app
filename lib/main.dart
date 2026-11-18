@@ -9,11 +9,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import 'audio_handler.dart';
+import 'cover_tint.dart' show CoverPalette, coverPalette;
 import 'cover_lookup.dart'
     show CoverCandidate, fetchCoverImage, kOnlineCovers, searchCandidates;
 import 'lyrics.dart';
 import 'player_controller.dart';
 import 'queue_page.dart';
+import 'settings_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,6 +81,118 @@ Color shadeTint(Color? c, Color fallback) {
       .withLightness((h.lightness * 0.55).clamp(0.10, 0.30).toDouble())
       .withSaturation(h.saturation.clamp(0.0, 0.75).toDouble())
       .toColor();
+}
+
+/// Now Playing fonu: kapağın dominant və ikinci rəngindən 3 dayanacaqlı gradient + yumşaq işıq halesi.
+/// Kapaq dəyişəndə rənglər yumşaq keçidlə dəyişir. [rich] söndürülübsə köhnə sadə gradient.
+class CoverBackground extends StatefulWidget {
+  final Uint8List? cover;
+  final Color fallback;
+  final bool rich;
+  final Widget child;
+  const CoverBackground({
+    super.key,
+    required this.cover,
+    required this.fallback,
+    required this.rich,
+    required this.child,
+  });
+
+  @override
+  State<CoverBackground> createState() => _CoverBackgroundState();
+}
+
+class _CoverBackgroundState extends State<CoverBackground> {
+  CoverPalette? _pal;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(CoverBackground old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.cover, widget.cover)) _load();
+  }
+
+  void _load() {
+    final cv = widget.cover;
+    if (cv == null) {
+      _pal = null;
+      return;
+    }
+    coverPalette(cv).then((p) {
+      if (!mounted || !identical(widget.cover, cv)) return;
+      setState(() => _pal = p);
+    });
+  }
+
+  /// Fon üçün rəngi tündləşdirir; boz kapaqda doyğunluğu süni artırmır.
+  static Color _shade(Color c, double light) {
+    final h = HSLColor.fromColor(c);
+    final sat = h.saturation < 0.12 ? h.saturation : h.saturation.clamp(0.35, 0.85);
+    return h.withLightness(light).withSaturation(sat.toDouble()).toColor();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.rich && widget.cover != null ? _pal : null;
+    const dur = Duration(milliseconds: 700);
+    if (p == null) {
+      return AnimatedContainer(
+        duration: dur,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [widget.fallback, kBg],
+            stops: const [0.0, 0.7],
+          ),
+        ),
+        child: widget.child,
+      );
+    }
+    final top = _shade(p.primary, 0.30);
+    final mid = _shade(p.secondary, 0.16);
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: AnimatedContainer(
+            duration: dur,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [top, mid, kBg],
+                stops: const [0.0, 0.45, 0.85],
+              ),
+            ),
+          ),
+        ),
+        // kapağın arxasında yumşaq işıq halesi
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedContainer(
+              duration: dur,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.35),
+                  radius: 0.85,
+                  colors: [
+                    _shade(p.primary, 0.45).withValues(alpha: 0.38),
+                    _shade(p.primary, 0.45).withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        widget.child,
+      ],
+    );
+  }
 }
 
 // ================= Sıralama =================
@@ -629,10 +743,10 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const CircleAvatar(
-      radius: 18,
-      backgroundColor: Colors.deepOrange,
-      child: Icon(Icons.person, size: 20, color: Colors.white),
+    // profil şəkli: toxunanda Ayarlar açılır
+    return GestureDetector(
+      onTap: () => openSettings(context),
+      child: const ProfileCircle(radius: 18),
     );
   }
 }
@@ -788,16 +902,10 @@ class NowPlayingPage extends StatelessWidget {
         final top = shadeTint(song.tint, const Color(0xFF3A2E5C));
 
         return Scaffold(
-          body: AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [top, kBg],
-                stops: const [0.0, 0.7],
-              ),
-            ),
+          body: CoverBackground(
+            cover: song.cover,
+            fallback: top,
+            rich: c.dynamicBg,
             child: SafeArea(
               child: LayoutBuilder(
                 builder: (context, box) {
@@ -838,7 +946,20 @@ class NowPlayingPage extends StatelessWidget {
                       constraints: const BoxConstraints(maxWidth: 420),
                       child: AspectRatio(
                         aspectRatio: 1,
-                        child: ClipRRect(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (song.tint ?? Colors.black)
+                                    .withValues(alpha: 0.55),
+                                blurRadius: 40,
+                                spreadRadius: -4,
+                                offset: const Offset(0, 18),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: song.cover == null
                               ? Container(
@@ -852,6 +973,7 @@ class NowPlayingPage extends StatelessWidget {
                                   cacheWidth: 900,
                                   gaplessPlayback: true,
                                 ),
+                        ),
                         ),
                       ),
                     ),
@@ -958,7 +1080,7 @@ class NowPlayingPage extends StatelessWidget {
                         IconButton(
                           tooltip: 'Çalma ayarları',
                           icon: const Icon(Icons.tune),
-                          onPressed: () => showPlaybackSettingsSheet(context),
+                          onPressed: () => openSettings(context),
                         ),
                         const Spacer(),
                         IconButton(
@@ -3424,81 +3546,6 @@ class _EditSongPageState extends State<EditSongPage> {
       ),
     );
   }
-}
-
-
-// ================= Çalma ayarları: crossfade + ses seviyesi dengeleme =================
-String crossfadeLabel(double v) {
-  if (v <= 0) return 'Kapalı';
-  if (v < 1) return 'Boşluksuz geçiş';
-  return '${v.round()} saniye';
-}
-
-void showPlaybackSettingsSheet(BuildContext context) {
-  final c = PlayerController.instance;
-  const options = <double>[0, 0.25, 3, 5, 8, 12];
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: kCard,
-    shape: _sheetShape,
-    isScrollControlled: true,
-    builder: (ctx) => SafeArea(
-      child: ConstrainedBox(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
-        child: ListenableBuilder(
-          listenable: c,
-          builder: (context, _) => ListView(
-            shrinkWrap: true,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-                child: Text('Çalma ayarları',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              if (c.crossfadeSupported) ...[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: Text('Şarkılar arası geçiş',
-                      style: TextStyle(
-                          color: Colors.white70, fontWeight: FontWeight.w600)),
-                ),
-                for (final o in options)
-                  ListTile(
-                    dense: true,
-                    title: Text(crossfadeLabel(o)),
-                    trailing: c.crossfadeSecs == o
-                        ? const Icon(Icons.check, color: kGreen)
-                        : null,
-                    onTap: () => c.setCrossfade(o),
-                  ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Text(
-                      'Sıradaki şarkı otomatik geçişte önceden hazırlanır. '
-                      'Tek şarkı tekrarında ve uyku zamanlayıcısı "şarkı bitince" iken uygulanmaz.',
-                      style: TextStyle(color: Colors.white54, fontSize: 12)),
-                ),
-                const Divider(height: 1),
-              ],
-              SwitchListTile(
-                activeThumbColor: kGreen,
-                title: const Text('Ses seviyesini dengele'),
-                subtitle: Text(
-                    'Şarkılar arası ses farkını azaltır (ReplayGain etiketine göre). '
-                    '${c.gainTaggedCount}/${c.songs.length} şarkıda etiket var.',
-                    style:
-                        const TextStyle(color: Colors.white54, fontSize: 12)),
-                value: c.normalizeOn,
-                onChanged: c.setNormalize,
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 

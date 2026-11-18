@@ -11,12 +11,22 @@ class TagInfo {
   /// Gömülü şarkı sözü ham metni: LRC (zamanlı) ya da düz metin. Yoksa ''.
   final String lyrics;
 
+  /// Janr (ID3v1 nömrəsi mətnə çevrilir), buraxılış ili, trek və disk nömrəsi. Yoxdursa '' / 0.
+  final String genre;
+  final int year;
+  final int track;
+  final int disc;
+
   const TagInfo({
     this.title = '',
     this.artist = '',
     this.album = '',
     this.cover,
     this.lyrics = '',
+    this.genre = '',
+    this.year = 0,
+    this.track = 0,
+    this.disc = 0,
   });
 
   static const empty = TagInfo();
@@ -42,6 +52,47 @@ TagInfo readTags(Uint8List data, String ext) {
 }
 
 // ---------------------------------------------------------------- yardımcılar
+
+/// ID3v1 standart janr siyahısı (indeks = janr nömrəsi).
+const _kGenres = [
+  'Blues', 'Classic Rock', 'Country', 'Dance', 'Disco', 'Funk', 'Grunge', 'Hip-Hop',
+  'Jazz', 'Metal', 'New Age', 'Oldies', 'Other', 'Pop', 'R&B', 'Rap', 'Reggae', 'Rock',
+  'Techno', 'Industrial', 'Alternative', 'Ska', 'Death Metal', 'Pranks', 'Soundtrack',
+  'Euro-Techno', 'Ambient', 'Trip-Hop', 'Vocal', 'Jazz+Funk', 'Fusion', 'Trance',
+  'Classical', 'Instrumental', 'Acid', 'House', 'Game', 'Sound Clip', 'Gospel', 'Noise',
+  'Alt. Rock', 'Bass', 'Soul', 'Punk', 'Space', 'Meditative', 'Instrumental Pop',
+  'Instrumental Rock', 'Ethnic', 'Gothic', 'Darkwave', 'Techno-Industrial', 'Electronic',
+  'Pop-Folk', 'Eurodance', 'Dream', 'Southern Rock', 'Comedy', 'Cult', 'Gangsta', 'Top 40',
+  'Christian Rap', 'Pop/Funk', 'Jungle', 'Native American', 'Cabaret', 'New Wave',
+  'Psychedelic', 'Rave', 'Showtunes', 'Trailer', 'Lo-Fi', 'Tribal', 'Acid Punk',
+  'Acid Jazz', 'Polka', 'Retro', 'Musical', 'Rock & Roll', 'Hard Rock',
+];
+
+/// "(13)", "(13)Pop", "13" və ya "Pop" -> "Pop". Tanınmayan nömrə -> ''.
+String _id3Genre(String raw) {
+  var s = raw.trim();
+  final m = RegExp(r'^\((\d{1,3})\)\s*(.*)$').firstMatch(s);
+  if (m != null) {
+    final rest = m.group(2)!.trim();
+    if (rest.isNotEmpty) return rest;
+    s = m.group(1)!;
+  }
+  final n = int.tryParse(s);
+  if (n != null) return n >= 0 && n < _kGenres.length ? _kGenres[n] : '';
+  return s;
+}
+
+/// "2019", "2019-05-03", "2019-05-03T10:00" -> 2019. Tapılmazsa 0.
+int _yearOf(String s) {
+  final m = RegExp(r'(?:1[5-9]|20)\d{2}').firstMatch(s);
+  return m == null ? 0 : int.parse(m.group(0)!);
+}
+
+/// "3", "3/12", "03" -> 3. Tapılmazsa 0.
+int _leadInt(String s) {
+  final m = RegExp(r'^\s*(\d+)').firstMatch(s);
+  return m == null ? 0 : int.parse(m.group(1)!);
+}
 
 int _be32(Uint8List b, int o) =>
     b[o] * 16777216 + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
@@ -236,6 +287,8 @@ bool _looksLikeImage(Uint8List b) {
 
 TagInfo _readMp3(Uint8List d) {
   var title = '', artist = '', album = '';
+  var genre = '';
+  var year = 0, track = 0, disc = 0;
   var uslt = '', sylt = '';
   Uint8List? cover;
   var coverRank = -1;
@@ -300,6 +353,25 @@ TagInfo _readMp3(Uint8List d) {
           case 'TAL':
             if (album.isEmpty) album = _decodeText(body);
             break;
+          case 'TCON':
+          case 'TCO':
+            if (genre.isEmpty) genre = _id3Genre(_decodeText(body));
+            break;
+          case 'TYER':
+          case 'TYE':
+          case 'TDRC':
+          case 'TDRL':
+          case 'TDOR':
+            if (year == 0) year = _yearOf(_decodeText(body));
+            break;
+          case 'TRCK':
+          case 'TRK':
+            if (track == 0) track = _leadInt(_decodeText(body));
+            break;
+          case 'TPOS':
+          case 'TPA':
+            if (disc == 0) disc = _leadInt(_decodeText(body));
+            break;
           case 'USLT':
           case 'USL':
             if (uslt.isEmpty) uslt = _parseUslt(body);
@@ -331,6 +403,10 @@ TagInfo _readMp3(Uint8List d) {
       if (title.isEmpty) title = _latin1Z(d, o + 3, 30);
       if (artist.isEmpty) artist = _latin1Z(d, o + 33, 30);
       if (album.isEmpty) album = _latin1Z(d, o + 63, 30);
+      if (year == 0) year = _yearOf(_latin1Z(d, o + 93, 4));
+      // ID3v1.1: 29-cu baytda 0 varsa 30-cu bayt trek nömrəsidir
+      if (track == 0 && d[o + 125] == 0 && d[o + 126] != 0) track = d[o + 126];
+      if (genre.isEmpty && d[o + 127] < _kGenres.length) genre = _kGenres[d[o + 127]];
     }
   }
 
@@ -340,6 +416,10 @@ TagInfo _readMp3(Uint8List d) {
     album: _clean(album),
     cover: cover,
     lyrics: sylt.isNotEmpty ? sylt : uslt, // zamanlı söz varsa o tercih edilir
+    genre: _clean(genre),
+    year: year,
+    track: track,
+    disc: disc,
   );
 }
 
@@ -354,6 +434,8 @@ TagInfo _readFlac(Uint8List d) {
     return TagInfo.empty;
   }
   var title = '', artist = '', album = '';
+  var genre = '';
+  var year = 0, track = 0, disc = 0;
   var lyrics = '', syncedLyrics = '';
   Uint8List? cover;
   var coverRank = -1;
@@ -390,6 +472,10 @@ TagInfo _readFlac(Uint8List d) {
             if (k == 'TITLE' && title.isEmpty) title = v;
             if (k == 'ARTIST' && artist.isEmpty) artist = v;
             if (k == 'ALBUM' && album.isEmpty) album = v;
+            if (k == 'GENRE' && genre.isEmpty) genre = _id3Genre(v);
+            if ((k == 'DATE' || k == 'YEAR') && year == 0) year = _yearOf(v);
+            if (k == 'TRACKNUMBER' && track == 0) track = _leadInt(v);
+            if (k == 'DISCNUMBER' && disc == 0) disc = _leadInt(v);
             if ((k == 'LYRICS' || k == 'UNSYNCEDLYRICS') && lyrics.isEmpty) {
               lyrics = v;
             }
@@ -427,6 +513,10 @@ TagInfo _readFlac(Uint8List d) {
     album: _clean(album),
     cover: cover,
     lyrics: syncedLyrics.isNotEmpty ? syncedLyrics : lyrics,
+    genre: _clean(genre),
+    year: year,
+    track: track,
+    disc: disc,
   );
 }
 
@@ -463,6 +553,8 @@ TagInfo _readMp4(Uint8List d) {
   if (ilst == null) return TagInfo.empty;
 
   var title = '', artist = '', album = '', albumArtist = '', lyrics = '';
+  var genre = '';
+  var year = 0, track = 0, disc = 0;
   Uint8List? cover;
 
   var p = ilst.start;
@@ -490,6 +582,26 @@ TagInfo _readMp4(Uint8List d) {
         case 'aART':
           albumArtist = utf8.decode(payload, allowMalformed: true);
           break;
+        case '\u00A9gen':
+          genre = utf8.decode(payload, allowMalformed: true);
+          break;
+        case 'gnre':
+          // ikili janr: 2 bayt, ID3v1 indeksi + 1
+          if (genre.isEmpty && payload.length >= 2) {
+            final gi = ((payload[0] << 8) | payload[1]) - 1;
+            if (gi >= 0 && gi < _kGenres.length) genre = _kGenres[gi];
+          }
+          break;
+        case '\u00A9day':
+          year = _yearOf(utf8.decode(payload, allowMalformed: true));
+          break;
+        case 'trkn':
+          // 2 bayt boş, 2 bayt trek, 2 bayt cəmi
+          if (payload.length >= 4) track = (payload[2] << 8) | payload[3];
+          break;
+        case 'disk':
+          if (payload.length >= 4) disc = (payload[2] << 8) | payload[3];
+          break;
         case 'covr':
           if (_looksLikeImage(payload)) cover = payload;
           break;
@@ -504,6 +616,10 @@ TagInfo _readMp4(Uint8List d) {
     album: _clean(album),
     cover: cover,
     lyrics: lyrics,
+    genre: _clean(genre),
+    year: year,
+    track: track,
+    disc: disc,
   );
 }
 
