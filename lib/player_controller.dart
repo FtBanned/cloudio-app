@@ -58,6 +58,11 @@ class Song {
   int lastPlayedMs = 0; // son çalma anı (epoch ms), 0 = hiç çalınmadı
   double? gainDb; // ReplayGain etiketi (dB), yoksa null
   bool gainTried = false; // etiket bir kez arandı
+  String genre = ''; // etiketten ya da elle
+  int year = 0; // 0 = bilinmiyor
+  int trackNo = 0; // albümdeki sıra, 0 = bilinmiyor
+  int discNo = 0; // 0 = bilinmiyor
+  bool tagsTried = false; // janr/yıl/sıra etiketi bir kez okundu
 
   Song({
     required this.id,
@@ -208,6 +213,11 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
           s.lastPlayedMs = r.lastPlayedMs;
           s.gainDb = r.gainDb;
           s.gainTried = r.gainTried;
+          s.genre = r.genre;
+          s.year = r.year;
+          s.trackNo = r.trackNo;
+          s.discNo = r.discNo;
+          s.tagsTried = r.tagsTried;
           final dm = r.durationMs;
           if (dm != null) {
             s.durationTried = true;
@@ -269,6 +279,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     unawaited(_backfillDurations()); // süresi bilinməyən köhnə mahnılar üçün (bir dəfə)
     if (normalizeOn) unawaited(_backfillGains());
+    unawaited(_backfillTags()); // köhnə mahnılar üçün janr/il/trek bir dəfə oxunur
     unawaited(refreshCovers()); // üzlüyü olmayanlar üçün axtarışa davam
   }
 
@@ -342,6 +353,11 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       lastPlayedMs: s.lastPlayedMs,
       gainDb: s.gainDb,
       gainTried: s.gainTried,
+      genre: s.genre,
+      year: s.year,
+      trackNo: s.trackNo,
+      discNo: s.discNo,
+      tagsTried: s.tagsTried,
       audio: withAudio ? s.bytes : null,
     );
   }
@@ -567,6 +583,47 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       }
     } finally {
       _gainRunning = false;
+    }
+  }
+
+  bool _tagsRunning = false;
+
+  /// Bu yeniləmədən əvvəl əlavə olunmuş mahnılar üçün fayldan janr, il, trek və disk nömrəsini
+  /// bir dəfə oxuyur (istifadəçinin əl ilə yazdığı ad/sənətçi/albom dəyişmir).
+  Future<void> _backfillTags() async {
+    if (_tagsRunning) return;
+    _tagsRunning = true;
+    try {
+      var n = 0;
+      for (final s in songs.where((s) => !s.tagsTried).toList()) {
+        if (!songs.contains(s)) continue;
+        Uint8List? data;
+        try {
+          data = kIsWeb
+              ? await CloudioStore.instance.loadAudio(s.id)
+              : await readAudioBytes(s.path);
+        } catch (_) {}
+        if (data != null) {
+          final t = readTags(data, s.ext);
+          s.genre = t.genre;
+          s.year = t.year;
+          s.trackNo = t.track;
+          s.discNo = t.disc;
+          if (!s.gainTried) {
+            s.gainDb = readReplayGain(data, s.ext); // eyni oxumada pulsuz
+            s.gainTried = true;
+          }
+          s.tagsTried = true;
+          await _saveSong(s);
+        } else if (s.path == null && !kIsWeb) {
+          s.tagsTried = true; // fayl yoxdur: təkrar yoxlamağa dəyməz
+        }
+        if (++n % 10 == 0) notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 20));
+      }
+      if (n > 0) notifyListeners();
+    } finally {
+      _tagsRunning = false;
     }
   }
 
@@ -893,6 +950,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     required String title,
     required String artist,
     required String album,
+    String? genre,
+    int? year,
+    int? trackNo,
     Uint8List? cover,
     bool coverChanged = false,
   }) async {
@@ -901,6 +961,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     final a = artist.trim();
     s.artist = a.isEmpty ? kUnknownArtist : a;
     s.album = album.trim();
+    if (genre != null) s.genre = genre.trim();
+    if (year != null) s.year = year;
+    if (trackNo != null) s.trackNo = trackNo;
     if (coverChanged) {
       s.cover = cover;
       s.tint = cover == null ? null : await coverTint(cover);
@@ -1161,7 +1224,12 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         )
           ..durationTried = true
           ..gainDb = gain
-          ..gainTried = true;
+          ..gainTried = true
+          ..genre = tags.genre
+          ..year = tags.year
+          ..trackNo = tags.track
+          ..discNo = tags.disc
+          ..tagsTried = true;
         songs.add(song);
         final saved = await _saveSong(song, withAudio: true);
         // Baza yazdısa səs faylını yaddaşda saxlamırıq: çalanda bazadan oxunacaq

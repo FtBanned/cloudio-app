@@ -207,6 +207,51 @@ String songSortLabel(SongSort s) => switch (s) {
 
 int _cmpText(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
 
+/// Albom sırası: disk -> trek nömrəsi. Nömrəsi olmayanlar sonda, öz əvvəlki sırasında qalır.
+/// Heç bir mahnıda nömrə yoxdursa siyahı dəyişmir.
+List<Song> albumOrder(List<Song> src) {
+  if (src.every((s) => s.trackNo == 0)) return List<Song>.of(src);
+  final idx = <Song, int>{for (var i = 0; i < src.length; i++) src[i]: i};
+  final l = List<Song>.of(src);
+  int big(int v) => v == 0 ? 1 << 30 : v; // 0 = bilinmir, sona
+  l.sort((a, b) {
+    var r = big(a.discNo == 0 ? 1 : a.discNo).compareTo(big(b.discNo == 0 ? 1 : b.discNo));
+    if (r != 0) return r;
+    r = big(a.trackNo).compareTo(big(b.trackNo));
+    return r != 0 ? r : idx[a]!.compareTo(idx[b]!);
+  });
+  return l;
+}
+
+/// "2019 • Pop • 12 şarkı • 47 dk" (il və janr yalnız varsa).
+String albumInfo(List<Song> list) {
+  final years = [for (final s in list) if (s.year > 0) s.year];
+  final genre = list.firstWhere((s) => s.genre.trim().isNotEmpty,
+      orElse: () => list.first).genre.trim();
+  final parts = <String>[
+    if (years.isNotEmpty) '${years.reduce((a, b) => a < b ? a : b)}',
+    if (genre.isNotEmpty) genre,
+    countAndTotal(list),
+  ];
+  return parts.join(' • ');
+}
+
+/// Janra görə qruplar (böyükdən kiçiyə). Janrı olmayanlar daxil edilmir.
+List<SongGroup> groupGenres(List<Song> src) {
+  final map = <String, SongGroup>{};
+  for (final s in src) {
+    final g = s.genre.trim();
+    if (g.isEmpty) continue;
+    map.putIfAbsent(g.toLowerCase(), () => SongGroup(g)).songs.add(s);
+  }
+  final l = map.values.toList()
+    ..sort((a, b) {
+      final r = b.songs.length.compareTo(a.songs.length);
+      return r != 0 ? r : _cmpText(a.name, b.name);
+    });
+  return l;
+}
+
 /// [src] siyahısının sıralanmış KOPYASINI qaytarır (orijinal dəyişmir).
 List<Song> sortedSongs(List<Song> src, SongSort sort) {
   final l = List<Song>.of(src);
@@ -1519,7 +1564,8 @@ class _SearchPageState extends State<SearchPage> {
             if (q.isNotEmpty &&
                 (c.songs[i].title.toLowerCase().contains(q) ||
                     c.songs[i].artist.toLowerCase().contains(q) ||
-                    c.songs[i].album.toLowerCase().contains(q)))
+                    c.songs[i].album.toLowerCase().contains(q) ||
+                    c.songs[i].genre.toLowerCase().contains(q)))
               i,
         ];
 
@@ -1560,22 +1606,7 @@ class _SearchPageState extends State<SearchPage> {
               const SizedBox(height: 16),
               Expanded(
                 child: q.isEmpty
-                    ? SingleChildScrollView(
-                        child: GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 2.0,
-                          children: const [
-                            CategoryTile('Müzik', Color(0xFFE91E8C)),
-                            CategoryTile('Podcast\'ler', Color(0xFF00695C)),
-                            CategoryTile('Sesli kitaplar', Color(0xFF283593)),
-                            CategoryTile('Canlı Etkinlikler', Color(0xFF8E24AA)),
-                          ],
-                        ),
-                      )
+                    ? _GenreBrowser(genres: groupGenres(c.songs))
                     : matchSongs.isEmpty
                         ? const Center(
                             child: Text('Sonuç bulunamadı',
@@ -1598,23 +1629,113 @@ class _SearchPageState extends State<SearchPage> {
   }
 }
 
-class CategoryTile extends StatelessWidget {
-  final String label;
-  final Color color;
-  const CategoryTile(this.label, this.color, {super.key});
+/// Axtarışda boş sorğuda göstərilən "Janrlara göz at" bölməsi.
+class _GenreBrowser extends StatelessWidget {
+  final List<SongGroup> genres;
+  const _GenreBrowser({required this.genres});
+
+  static const _colors = [
+    Color(0xFFE91E8C),
+    Color(0xFF00695C),
+    Color(0xFF283593),
+    Color(0xFF8E24AA),
+    Color(0xFFD84315),
+    Color(0xFF1565C0),
+    Color(0xFF558B2F),
+    Color(0xFFAD1457),
+  ];
+
+  Color _colorFor(String name) {
+    var h = 0;
+    for (final u in name.toLowerCase().codeUnits) {
+      h = (h * 31 + u) & 0x7fffffff;
+    }
+    return _colors[h % _colors.length];
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
+    if (genres.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            'Henüz janr bilgisi yok.\nŞarkıların etiketinde janr varsa burada görünür; '
+            'şarkı menüsünden de elle ekleyebilirsin.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60),
+          ),
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text('Janrlara göz at',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 2.0,
+            children: [
+              for (final g in genres)
+                CategoryTile(
+                  g.name,
+                  _colorFor(g.name),
+                  subtitle: '${g.songs.length} şarkı',
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => CollectionPage.genre(g.name),
+                  )),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
-      alignment: Alignment.topLeft,
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    );
+  }
+}
+
+class CategoryTile extends StatelessWidget {
+  final String label;
+  final Color color;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  const CategoryTile(this.label, this.color,
+      {super.key, this.subtitle, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.topLeft,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (subtitle != null)
+              Text(subtitle!,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          ],
+        ),
       ),
     );
   }
@@ -1893,7 +2014,7 @@ void openPlaylist(BuildContext context, Playlist p) {
   ));
 }
 
-enum _CollectionKind { all, liked, playlist, artist, album }
+enum _CollectionKind { all, liked, playlist, artist, album, genre }
 
 // ---- Sənətçi / albom qrupları ----
 class SongGroup {
@@ -1951,6 +2072,10 @@ class CollectionPage extends StatefulWidget {
       : kind = _CollectionKind.album,
         playlistRef = null,
         groupName = name;
+  const CollectionPage.genre(String name, {super.key})
+      : kind = _CollectionKind.genre,
+        playlistRef = null,
+        groupName = name;
 
   @override
   State<CollectionPage> createState() => _CollectionPageState();
@@ -1985,7 +2110,10 @@ class _CollectionPageState extends State<CollectionPage> {
           final key = gName.trim().toLowerCase();
           groupSongsNow = [
             for (final s in c.songs)
-              if (_groupName(s, byAlbum).toLowerCase() == key) s,
+              if ((kind == _CollectionKind.genre ? s.genre.trim() : _groupName(s, byAlbum))
+                      .toLowerCase() ==
+                  key)
+                s,
           ];
           if (groupSongsNow.isEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2000,6 +2128,7 @@ class _CollectionPageState extends State<CollectionPage> {
         switch (kind) {
           case _CollectionKind.artist:
           case _CollectionKind.album:
+          case _CollectionKind.genre:
             base = groupSongsNow;
             title = gName!;
           case _CollectionKind.all:
@@ -2013,7 +2142,10 @@ class _CollectionPageState extends State<CollectionPage> {
             title = pl.name;
         }
         // Ekranda göstərilən və çalınan siyahı (seçilmiş sıralama ilə)
-        final list = sortedSongs(base, _sort);
+        // albom səhifəsində "Varsayılan" sıra: disk və trek nömrəsinə görə
+        final list = kind == _CollectionKind.album && _sort == SongSort.standard
+            ? albumOrder(base)
+            : sortedSongs(base, _sort);
 
         Color? tint;
         for (final s in base) {
@@ -2051,7 +2183,10 @@ class _CollectionPageState extends State<CollectionPage> {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(countAndTotal(list),
+                    child: Text(
+                        kind == _CollectionKind.album
+                            ? albumInfo(list)
+                            : countAndTotal(list),
                         style: const TextStyle(color: Colors.white60)),
                   ),
                   Padding(
@@ -2171,6 +2306,7 @@ class _CollectionPageState extends State<CollectionPage> {
                             _CollectionKind.playlist =>
                               'Bu liste boş.\n"Ekle" ile kitaplığından şarkı seç.',
                             _CollectionKind.artist ||
+                            _CollectionKind.genre ||
                             _CollectionKind.album =>
                               'Bu bölümde şarkı yok.',
                           },
@@ -3383,6 +3519,9 @@ class _EditSongPageState extends State<EditSongPage> {
   late final TextEditingController _title;
   late final TextEditingController _artist;
   late final TextEditingController _album;
+  late final TextEditingController _genre;
+  late final TextEditingController _year;
+  late final TextEditingController _track;
   Uint8List? _cover;
   bool _coverChanged = false;
   bool _busy = false;
@@ -3395,6 +3534,9 @@ class _EditSongPageState extends State<EditSongPage> {
     _artist = TextEditingController(
         text: s.artist == kUnknownArtist ? '' : s.artist);
     _album = TextEditingController(text: s.album);
+    _genre = TextEditingController(text: s.genre);
+    _year = TextEditingController(text: s.year > 0 ? '${s.year}' : '');
+    _track = TextEditingController(text: s.trackNo > 0 ? '${s.trackNo}' : '');
     _cover = s.cover;
   }
 
@@ -3403,6 +3545,9 @@ class _EditSongPageState extends State<EditSongPage> {
     _title.dispose();
     _artist.dispose();
     _album.dispose();
+    _genre.dispose();
+    _year.dispose();
+    _track.dispose();
     super.dispose();
   }
 
@@ -3458,6 +3603,9 @@ class _EditSongPageState extends State<EditSongPage> {
       title: _title.text,
       artist: _artist.text,
       album: _album.text,
+      genre: _genre.text,
+      year: int.tryParse(_year.text.trim()) ?? 0,
+      trackNo: int.tryParse(_track.text.trim()) ?? 0,
       cover: _cover,
       coverChanged: _coverChanged,
     );
@@ -3541,6 +3689,36 @@ class _EditSongPageState extends State<EditSongPage> {
             controller: _album,
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(labelText: 'Albüm'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _genre,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Janr'),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _year,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  decoration:
+                      const InputDecoration(labelText: 'Yıl', counterText: ''),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextField(
+                  controller: _track,
+                  keyboardType: TextInputType.number,
+                  maxLength: 3,
+                  decoration: const InputDecoration(
+                      labelText: 'Albümdeki sıra', counterText: ''),
+                ),
+              ),
+            ],
           ),
         ],
       ),

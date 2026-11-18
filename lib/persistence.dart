@@ -28,6 +28,11 @@ class SavedSong {
   final int lastPlayedMs; // 0: heç çalınmayıb
   final double? gainDb; // ReplayGain (dB), yoxdursa null
   final bool gainTried; // etiket bir dəfə yoxlanıb
+  final String genre;
+  final int year; // 0: yoxdur
+  final int trackNo; // 0: yoxdur
+  final int discNo; // 0: yoxdur
+  final bool tagsTried; // janr/il/trek etiketi bir dəfə oxunub
 
   SavedSong({
     required this.id,
@@ -47,6 +52,11 @@ class SavedSong {
     this.lastPlayedMs = 0,
     this.gainDb,
     this.gainTried = false,
+    this.genre = '',
+    this.year = 0,
+    this.trackNo = 0,
+    this.discNo = 0,
+    this.tagsTried = false,
   });
 }
 
@@ -175,6 +185,11 @@ class CloudioStore {
             lastPlayedMs: m['last'] as int? ?? 0,
             gainDb: (m['gain'] as num?)?.toDouble(),
             gainTried: m['gt'] as bool? ?? false,
+            genre: m['genre'] as String? ?? '',
+            year: m['year'] as int? ?? 0,
+            trackNo: m['trk'] as int? ?? 0,
+            discNo: m['disc'] as int? ?? 0,
+            tagsTried: m['tt'] as bool? ?? false,
           ));
         } catch (e) {
           debugPrint('[Cloudio DB] bir mahnı oxunmadı (${snap.key}): $e');
@@ -237,6 +252,11 @@ class CloudioStore {
     int lastPlayedMs = 0,
     double? gainDb,
     bool gainTried = false,
+    String genre = '',
+    int year = 0,
+    int trackNo = 0,
+    int discNo = 0,
+    bool tagsTried = false,
     Uint8List? audio,
   }) async {
     final db = _db;
@@ -259,6 +279,11 @@ class CloudioStore {
         'last': lastPlayedMs,
         'gain': gainDb,
         'gt': gainTried,
+        'genre': genre,
+        'year': year,
+        'trk': trackNo,
+        'disc': discNo,
+        'tt': tagsTried,
       };
       await db.transaction((txn) async {
         await _songs.record(id).put(txn, meta);
