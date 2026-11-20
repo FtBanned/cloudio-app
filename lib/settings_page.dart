@@ -59,9 +59,9 @@ class SettingsPage extends StatelessWidget {
 
             ListTile(
               leading: Icon(Icons.insights_outlined, color: kGreen),
-              title: const Text('Şəxsi statistika'),
+              title: const Text('Kişisel istatistik'),
               subtitle: Text(
-                  'Aylıq sənətçilər, dinləmə vaxtı, ən çox dinlənənlər',
+                  'Aylık sanatçılar, dinleme süresi, en çok dinlenenler',
                   style: TextStyle(color: kText54, fontSize: 12)),
               trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => openStats(context),
@@ -70,7 +70,7 @@ class SettingsPage extends StatelessWidget {
             // ---------- Çalma ----------
             const _SectionTitle('Çalma'),
             _Block(
-              title: 'Çalma sürəti',
+              title: 'Çalma hızı',
               trailing: speedLabel(c.speed),
               child: Wrap(
                 spacing: 8,
@@ -178,7 +178,7 @@ class SettingsPage extends StatelessWidget {
       final m = left.inMinutes + (left.inSeconds % 60 > 0 ? 1 : 0);
       final hh = end.hour.toString().padLeft(2, '0');
       final mm = end.minute.toString().padLeft(2, '0');
-      return '$hh:$mm-də duracak (~${m < 1 ? 1 : m} dk qaldı)';
+      return 'Duracağı saat: $hh:$mm (~${m < 1 ? 1 : m} dk kaldı)';
     }
     return 'Kapalı';
   }
@@ -257,7 +257,7 @@ class _ThemeBlock extends StatelessWidget {
         _Block(
           title: 'Tema',
           trailing: themeModeLabel(t.mode),
-          note: 'AMOLED: tam qara fon, OLED ekranlarda batareya qənaət edir.',
+          note: 'AMOLED: tam siyah arka plan, OLED ekranlarda pil tasarrufu sağlar.',
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -272,7 +272,7 @@ class _ThemeBlock extends StatelessWidget {
           ),
         ),
         _Block(
-          title: 'Vurğu rəngi',
+          title: 'Vurgu rengi',
           trailing: kAccentColors[t.accentIndex].$1,
           child: Wrap(
             spacing: 12,
@@ -509,7 +509,7 @@ class _ProfileCard extends StatelessWidget {
                   foregroundColor: light, padding: EdgeInsets.zero),
               onPressed: () => openStats(context),
               icon: const Icon(Icons.insights_outlined, size: 18),
-              label: const Text('Şəxsi statistika'),
+              label: const Text('Kişisel istatistik'),
             ),
           ),
           const SizedBox(height: 4),
@@ -614,8 +614,12 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-/// Admin kartının fonu: əvvəl foto görünür, video hazır olanda səssiz və dövrlə oynayır.
-/// Video açılmasa (xəta) foto qalır, tətbiq işləməyə davam edir.
+/// Admin kartının fonu: önce foto görünür, video hazır olunca sessiz ve döngüyle oynar.
+/// Video açılmazsa (hata) foto kalır, uygulama çalışmaya devam eder.
+///
+/// Pil ve ısı tasarrufu: kartın üstünü başka bir sayfa kapatınca (ör. istatistik
+/// sayfası) ya da uygulama arka plana/kilit ekranına geçince video duraklatılır,
+/// kart yeniden görününce kaldığı yerden devam eder.
 class _AdminBackdrop extends StatefulWidget {
   final Color tint;
   const _AdminBackdrop({required this.tint});
@@ -624,14 +628,18 @@ class _AdminBackdrop extends StatefulWidget {
   State<_AdminBackdrop> createState() => _AdminBackdropState();
 }
 
-class _AdminBackdropState extends State<_AdminBackdrop> {
+class _AdminBackdropState extends State<_AdminBackdrop>
+    with WidgetsBindingObserver {
   VideoPlayerController? _vc;
   bool _ready = false;
   bool _gone = false;
+  bool _pageVisible = true; // üstünü başka sayfa kapatmadı mı
+  bool _appForeground = true; // uygulama ön planda mı
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initVideo();
   }
 
@@ -639,25 +647,52 @@ class _AdminBackdropState extends State<_AdminBackdrop> {
     try {
       final vc = VideoPlayerController.asset(
         'assets/admin_bg.mp4',
-        // Musiqini kəsməsin: səs sessiyası digər səslərlə qarışsın
+        // Müziği kesmesin: ses oturumu diğer seslerle karışsın
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
       _vc = vc;
       await vc.initialize();
-      if (_gone) return; // dispose() artıq controller-i bağlayıb
+      if (_gone) return; // dispose() controller'ı zaten kapattı
       await vc.setVolume(0);
       await vc.setLooping(true);
-      await vc.play();
       if (_gone) return;
       setState(() => _ready = true);
+      _syncPlayback();
     } catch (e) {
       debugPrint('Admin fon videosu açılmadı: $e');
     }
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Başka bir sayfa bu sayfanın üstünü kapatınca TickerMode kapanır.
+    _pageVisible = TickerMode.of(context);
+    _syncPlayback();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appForeground = state == AppLifecycleState.resumed;
+    _syncPlayback();
+  }
+
+  /// Video yalnızca kart görünürken ve uygulama ön plandayken oynar.
+  void _syncPlayback() {
+    final vc = _vc;
+    if (vc == null || !_ready || _gone) return;
+    final shouldPlay = _pageVisible && _appForeground;
+    if (shouldPlay && !vc.value.isPlaying) {
+      vc.play();
+    } else if (!shouldPlay && vc.value.isPlaying) {
+      vc.pause();
+    }
+  }
+
+  @override
   void dispose() {
     _gone = true;
+    WidgetsBinding.instance.removeObserver(this);
     _vc?.dispose();
     super.dispose();
   }
@@ -679,7 +714,7 @@ class _AdminBackdropState extends State<_AdminBackdrop> {
               child: VideoPlayer(vc),
             ),
           ),
-        // Yazıların oxunması üçün tünd qat (profil rəngi ilə)
+        // Yazıların okunması için koyu katman (profil rengiyle)
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(

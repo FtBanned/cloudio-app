@@ -14,9 +14,9 @@ void openStats(BuildContext context) {
 
 enum _Range { thisMonth, lastMonth, all }
 
-const _azMonths = [
-  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun',
-  'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'
+const _trMonths = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
 ];
 
 String _dur(Duration d) {
@@ -126,7 +126,7 @@ class _StatsPageState extends State<StatsPage> {
     final c = PlayerController.instance;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Şəxsi statistika',
+        title: const Text('Kişisel istatistik',
             style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListenableBuilder(
@@ -137,8 +137,8 @@ class _StatsPageState extends State<StatsPage> {
           final prev = DateTime(now.year, now.month - 1);
           final periodName = switch (_range) {
             _Range.thisMonth => 'Bu ay',
-            _Range.lastMonth => 'Keçən ay',
-            _Range.all => 'Hamısı',
+            _Range.lastMonth => 'Geçen ay',
+            _Range.all => 'Tümü',
           };
           return ListView(
             padding: EdgeInsets.fromLTRB(
@@ -150,9 +150,9 @@ class _StatsPageState extends State<StatsPage> {
                   for (final r in _Range.values)
                     _RangeChip(
                       label: switch (r) {
-                        _Range.thisMonth => '${_azMonths[now.month - 1]} (bu ay)',
-                        _Range.lastMonth => _azMonths[prev.month - 1],
-                        _Range.all => 'Hamısı',
+                        _Range.thisMonth => '${_trMonths[now.month - 1]} (bu ay)',
+                        _Range.lastMonth => _trMonths[prev.month - 1],
+                        _Range.all => 'Tümü',
                       },
                       selected: _range == r,
                       onTap: () => setState(() => _range = r),
@@ -163,8 +163,8 @@ class _StatsPageState extends State<StatsPage> {
               if (d.plays == 0)
                 _Empty(
                     text: _range == _Range.all
-                        ? 'Hələ heç nə dinləməmisən.\nBir mahnını 30 saniyə dinlə, burada görünəcək.'
-                        : '$periodName üçün dinləmə yoxdur.')
+                        ? 'Henüz hiçbir şey dinlemedin.\nBir şarkıyı 30 saniye dinle, burada görünecek.'
+                        : '$periodName için dinleme yok.')
               else ...[
                 _HeroCard(data: d, period: periodName),
                 const SizedBox(height: 16),
@@ -173,36 +173,36 @@ class _StatsPageState extends State<StatsPage> {
                     artist: d.artists.first,
                     total: d.plays,
                     title: switch (_range) {
-                      _Range.thisMonth => 'Bu ayın ən çox dinlədiyi sənətçi',
-                      _Range.lastMonth => 'Keçən ayın ən çox dinlədiyi sənətçi',
-                      _Range.all => 'Ən çox dinlədiyin sənətçi',
+                      _Range.thisMonth => 'Bu ay en çok dinlediğin sanatçı',
+                      _Range.lastMonth => 'Geçen ay en çok dinlediğin sanatçı',
+                      _Range.all => 'En çok dinlediğin sanatçı',
                     },
                   ),
                   const _Gap(),
                   _RankCard(
-                    title: 'Ən çox dinlənən sənətçilər',
+                    title: 'En çok dinlenen sanatçılar',
                     items: d.artists,
-                    unit: 'dəfə',
+                    unit: 'kez',
                   ),
                   const _Gap(),
                 ],
                 _RankCard(
-                  title: 'Ən çox dinlənən mahnılar',
+                  title: 'En çok dinlenen şarkılar',
                   items: d.songs,
-                  unit: 'dəfə',
+                  unit: 'kez',
                   showSub: true,
                 ),
                 if (d.genres.isNotEmpty) ...[
                   const _Gap(),
                   _RankCard(
-                      title: 'Janrlar', items: d.genres, unit: 'dəfə'),
+                      title: 'Janrlar', items: d.genres, unit: 'kez'),
                 ],
               ],
               if (_range != _Range.all && c.untrackedPlays > 0) ...[
                 const SizedBox(height: 12),
                 Text(
-                    'Qeyd: yeniləmədən əvvəlki ${c.untrackedPlays} dinləmənin tarixi '
-                    'bilinmir, ona görə yalnız "Hamısı" bölməsində sayılır.',
+                    'Not: güncellemeden önceki ${c.untrackedPlays} dinlemenin tarihi '
+                    'bilinmiyor, bu yüzden yalnızca "Tümü" bölümünde sayılır.',
                     style:
                         TextStyle(color: kText38, fontSize: 11)),
               ],
@@ -301,7 +301,7 @@ class _HeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ümumi dinləmə vaxtı • $period',
+          Text('Toplam dinleme süresi • $period',
               style: const TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 6),
           Text(data.ms > 0 ? _dur(Duration(milliseconds: data.ms)) : '—',
@@ -310,9 +310,9 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              _MiniStat(value: '${data.plays}', label: 'Dinləmə'),
-              _MiniStat(value: '${data.uniqueSongs}', label: 'Fərqli mahnı'),
-              _MiniStat(value: '${data.uniqueArtists}', label: 'Sənətçi'),
+              _MiniStat(value: '${data.plays}', label: 'Dinleme'),
+              _MiniStat(value: '${data.uniqueSongs}', label: 'Farklı şarkı'),
+              _MiniStat(value: '${data.uniqueArtists}', label: 'Sanatçı'),
             ],
           ),
         ],
@@ -377,7 +377,7 @@ class _TopArtistCard extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
-                Text('${artist.count} dinləmə • dinləmələrin $share%-i',
+                Text('${artist.count} dinleme • toplamın %$share',
                     style:
                         TextStyle(color: kText70, fontSize: 13)),
               ],
@@ -505,22 +505,22 @@ class _ActivityCard extends StatelessWidget {
       }
     }
     String part(int h) => h >= 5 && h < 12
-        ? 'səhər'
+        ? 'sabah'
         : h >= 12 && h < 17
             ? 'gündüz'
             : h >= 17 && h < 22
-                ? 'axşam'
-                : 'gecə';
+                ? 'akşam'
+                : 'gece';
 
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Aktivlik • son 14 gün',
+          const Text('Etkinlik • son 14 gün',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
           if (maxC == 0)
-            Text('Son 14 gündə dinləmə yoxdur.',
+            Text('Son 14 günde dinleme yok.',
                 style: TextStyle(color: kText54, fontSize: 13))
           else
             SizedBox(
@@ -567,14 +567,14 @@ class _ActivityCard extends StatelessWidget {
             children: [
               _MiniStat(
                   value: streak == 0 ? '—' : '$streak gün',
-                  label: 'Ardıcıl dinləmə'),
+                  label: 'Üst üste dinleme'),
               _MiniStat(
                   value: peakHour < 0
                       ? '—'
                       : '${peakHour.toString().padLeft(2, '0')}:00',
                   label: peakHour < 0
-                      ? 'Ən aktiv saat'
-                      : 'Ən aktiv saat (${part(peakHour)})'),
+                      ? 'En aktif saat'
+                      : 'En aktif saat (${part(peakHour)})'),
             ],
           ),
         ],

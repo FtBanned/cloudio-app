@@ -8,20 +8,20 @@ enum AppThemeMode { dark, amoled, light }
 
 /// Vurğu rəngləri (düymələr, seçilmiş elementlər, tikələr).
 const kAccentColors = <(String, Color)>[
-  ('Yaşıl', Color(0xFF1DB954)),
+  ('Yeşil', Color(0xFF1DB954)),
   ('Mavi', Color(0xFF2E9BFF)),
-  ('Bənövşəyi', Color(0xFF9B6BFF)),
-  ('Çəhrayı', Color(0xFFF0508C)),
-  ('Narıncı', Color(0xFFFF7A3D)),
+  ('Mor', Color(0xFF9B6BFF)),
+  ('Pembe', Color(0xFFF0508C)),
+  ('Turuncu', Color(0xFFFF7A3D)),
   ('Sarı', Color(0xFFFFC933)),
-  ('Qırmızı', Color(0xFFEF4444)),
-  ('Firuzəyi', Color(0xFF14B8A6)),
+  ('Kırmızı', Color(0xFFEF4444)),
+  ('Turkuaz', Color(0xFF14B8A6)),
 ];
 
 String themeModeLabel(AppThemeMode m) => switch (m) {
-      AppThemeMode.dark => 'Tünd',
+      AppThemeMode.dark => 'Koyu',
       AppThemeMode.amoled => 'AMOLED',
-      AppThemeMode.light => 'Açıq',
+      AppThemeMode.light => 'Açık',
     };
 
 /// Tətbiqin cari görünüşü. Rənglər (kGreen, kBg, kCard, kText...) buradan oxunur.
