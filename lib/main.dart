@@ -10,6 +10,7 @@ import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import 'app_theme.dart';
 import 'audio_handler.dart';
+import 'backup_page.dart' show openBackupPage;
 import 'cover_tint.dart' show CoverPalette, coverPalette;
 import 'cover_lookup.dart'
     show CoverCandidate, fetchCoverImage, kOnlineCovers, searchCandidates;

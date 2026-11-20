@@ -16,6 +16,7 @@ import 'main.dart'
         kText70,
         formatTotal,
         showSleepSheet;
+import 'backup_page.dart';
 import 'player_controller.dart';
 import 'stats_page.dart';
 
@@ -157,6 +158,22 @@ class SettingsPage extends StatelessWidget {
                       : 'Toplam süre: ${formatTotal(c.songs)}',
                   style: TextStyle(color: kText54, fontSize: 12)),
             ),
+            if (!kIsWeb)
+              ListTile(
+                leading: Icon(Icons.cloud_upload_outlined, color: kGreen),
+                title: const Text('Yedekle ve geri yükle'),
+                subtitle: Text(
+                    c.missingAudioCount > 0
+                        ? '${c.missingAudioCount} şarkının ses dosyası eksik'
+                        : 'Kitaplığını dosyaya kaydet, uygulamayı silsen bile geri getir',
+                    style: TextStyle(
+                        color: c.missingAudioCount > 0
+                            ? Colors.orangeAccent
+                            : kText54,
+                        fontSize: 12)),
+                trailing: Icon(Icons.chevron_right, color: kText38),
+                onTap: () => openBackupPage(context),
+              ),
 
             // ---------- Hakkında ----------
             const _SectionTitle('Hakkında'),

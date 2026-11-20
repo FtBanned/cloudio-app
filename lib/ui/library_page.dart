@@ -52,6 +52,16 @@ class _LibraryPageState extends State<LibraryPage> {
                           ? c.cancelCovers
                           : () => c.refreshCovers(retryNone: true),
                     ),
+                  if (kOnlineCovers)
+                    IconButton(
+                      icon: Icon(c.metaRunning ? Icons.close : Icons.sell_outlined,
+                          size: 25),
+                      tooltip: c.metaRunning
+                          ? 'Aramayı durdur'
+                          : 'Tür, yıl ve albüm sırasını bul',
+                      onPressed:
+                          c.metaRunning ? c.cancelMeta : c.refreshMeta,
+                    ),
                   IconButton(
                     icon: const Icon(Icons.add, size: 28),
                     tooltip: 'Şarkı ekle',
@@ -90,6 +100,29 @@ class _LibraryPageState extends State<LibraryPage> {
                 child: Text(c.coversNote!,
                     style:
                         TextStyle(fontSize: 12, color: kText60)),
+              ),
+            if (c.metaRunning)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      minHeight: 2,
+                      value: c.metaTotal == 0 ? null : c.metaDone / c.metaTotal,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                        'Tür, yıl ve albüm sırası aranıyor… ${c.metaDone}/${c.metaTotal}',
+                        style: TextStyle(fontSize: 12, color: kText60)),
+                  ],
+                ),
+              )
+            else if (c.metaNote != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(c.metaNote!,
+                    style: TextStyle(fontSize: 12, color: kText60)),
               ),
             _CollectionRow(
               leading: const _IconSquare(

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:sembast/sembast.dart';
+import 'package:sembast/utils/sembast_import_export.dart';
 
 import 'cloudio_db_stub.dart'
     if (dart.library.js_interop) 'cloudio_db_web.dart'
@@ -144,6 +145,46 @@ class CloudioStore {
       debugPrint('[Cloudio DB] açıla bilmədi: $e');
       debugPrint('$st');
       _db = null;
+    }
+  }
+
+  // ---- yedək / bərpa ----
+
+  /// Bütün bazanı (mahnılar, üzlüklər, sözlər, siyahılar, bəyənmələr, statistika,
+  /// ayarlar, tema, profil, növbə) JSON-a çevrilə bilən Map kimi verir.
+  Future<Map<String, Object?>?> exportAll() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      return await exportDatabase(db);
+    } catch (e, st) {
+      debugPrint('[Cloudio DB] ixrac olunmadı: $e');
+      debugPrint('$st');
+      return null;
+    }
+  }
+
+  /// Bazanı yedəkdən gələn məzmunla tamamilə əvəz edir. Uğursuz olarsa köhnə baza
+  /// geri açılır və false qaytarılır.
+  Future<bool> replaceAll(Map<String, Object?> content) async {
+    final old = _db;
+    if (old == null) return false;
+    try {
+      await old.close();
+      _db = null;
+      final fresh = await importCloudioDb(content);
+      if (fresh == null) throw StateError('baza idxal olunmadı');
+      _db = fresh;
+      return true;
+    } catch (e, st) {
+      debugPrint('[Cloudio DB] bərpa olunmadı: $e');
+      debugPrint('$st');
+      try {
+        _db = await openCloudioDb();
+      } catch (e2) {
+        debugPrint('[Cloudio DB] köhnə baza açıla bilmədi: $e2');
+      }
+      return false;
     }
   }
 

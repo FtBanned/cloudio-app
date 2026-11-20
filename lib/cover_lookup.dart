@@ -199,6 +199,233 @@ Future<List<CoverCandidate>> searchCandidates(String query) async {
 /// Seçilen sonucun büyük kapağını indirir (okunamazsa null).
 Future<Uint8List?> fetchCoverImage(String url) => _getImage(url);
 
+// ------------------------------------------------------------ tür / yıl / albüm sırası
+
+/// İnternetten bulunan tür, yıl ve albümdeki sıra bilgisi (bulunamayan alan boş/0 kalır).
+class MetaHit {
+  final String genre;
+  final int year;
+  final int trackNo;
+  final int discNo;
+  final String source;
+  const MetaHit(
+      {this.genre = '',
+      this.year = 0,
+      this.trackNo = 0,
+      this.discNo = 0,
+      this.source = ''});
+}
+
+class _MetaCand {
+  final _Cand base; // ad/sanatçı/albüm: eşleştirme puanı için
+  String genre;
+  int year;
+  int trackNo;
+  int discNo;
+  final Future<void> Function(_MetaCand)? _detail; // ek istekle tamamlanacak kaynaklar
+  _MetaCand(this.base,
+      {this.genre = '',
+      this.year = 0,
+      this.trackNo = 0,
+      this.discNo = 0,
+      Future<void> Function(_MetaCand)? detail})
+      : _detail = detail;
+
+  Future<void> resolve() async {
+    final d = _detail;
+    if (d != null) await d(this);
+  }
+}
+
+int _asInt(Object? v) => v is num ? v.toInt() : (int.tryParse('${v ?? ''}') ?? 0);
+
+/// "2019-05-17T12:00:00Z" / "2019-05-17" / "2019" -> 2019 (mantıksız yıl 0 olur).
+int _yearOf(Object? v) {
+  final m = RegExp(r'^\s*(\d{4})').firstMatch('${v ?? ''}');
+  if (m == null) return 0;
+  final y = int.parse(m.group(1)!);
+  return (y >= 1900 && y <= DateTime.now().year + 1) ? y : 0;
+}
+
+/// Şarkının türünü, çıkış yılını ve albümdeki sırasını arar (hepsi anahtarsız):
+/// önce Deezer (hızlı), eksik kalan alanlar için iTunes (tr, us, az). Eşleştirme kapak
+/// aramasıyla aynı bulanık puanlamayı kullanır; yanlış şarkının bilgisi yazılmasın diye
+/// eşik yüksektir. Sadece [needGenre]/[needYear]/[needTrack] istenen alanlar doldurulur.
+/// Hiçbir kaynağa ulaşılamazsa istisna fırlatır; hiçbir şey bulunamazsa null döner.
+Future<MetaHit?> findMeta({
+  required String title,
+  String artist = '',
+  bool needGenre = true,
+  bool needYear = true,
+  bool needTrack = true,
+}) async {
+  final qTitle = cleanForSearch(title);
+  final qArtist = cleanForSearch(artist);
+  if (qTitle.isEmpty) return null;
+  final noFeat = _stripFeat(qTitle);
+
+  final seen = <String>{};
+  final queries = <String>[
+    for (final q in [
+      qArtist.isEmpty ? qTitle : '$qArtist $qTitle',
+      if (qArtist.isNotEmpty) qTitle,
+      if (noFeat.isNotEmpty && noFeat != qTitle)
+        (qArtist.isEmpty ? noFeat : '$qArtist $noFeat'),
+    ])
+      if (seen.add(_norm(q))) q,
+  ];
+  final minScore = qArtist.isEmpty ? 0.85 : 0.72;
+
+  var genre = '';
+  var year = 0;
+  var trackNo = 0;
+  var discNo = 0;
+  var src = '';
+  bool done() =>
+      (!needGenre || genre.isNotEmpty) &&
+      (!needYear || year > 0) &&
+      (!needTrack || trackNo > 0);
+
+  final sources = <(String, Future<List<_MetaCand>> Function(String))>[
+    ('Deezer', (q) => _deezerMeta(q)),
+    for (final cc in const ['tr', 'us', 'az']) ('iTunes-$cc', (q) => _itunesMeta(q, cc)),
+  ];
+
+  var reached = 0;
+  Object? lastError;
+  for (final (name, search) in sources) {
+    if (done()) break;
+    for (final q in queries) {
+      if (done()) break;
+      try {
+        final cands = await search(q);
+        reached++;
+        _MetaCand? best;
+        var bestScore = 0.0;
+        for (final c in cands) {
+          var sc = _score(c.base, qTitle, qArtist);
+          if (qArtist.isNotEmpty) {
+            final b = _score(c.base, qArtist, qTitle); // "Şarkı - Sanatçı" sırası
+            if (b > sc) sc = b;
+          }
+          if (sc >= minScore && sc > bestScore) {
+            best = c;
+            bestScore = sc;
+          }
+        }
+        if (best == null) continue;
+        await best.resolve();
+        var got = false;
+        if (needGenre && genre.isEmpty && best.genre.isNotEmpty) {
+          genre = best.genre;
+          got = true;
+        }
+        if (needYear && year == 0 && best.year > 0) {
+          year = best.year;
+          got = true;
+        }
+        if (needTrack && trackNo == 0 && best.trackNo > 0) {
+          trackNo = best.trackNo;
+          discNo = best.discNo;
+          got = true;
+        }
+        debugPrint('[Bilgi] "$q" · $name: ${got ? 'BULUNDU' : 'eşleşti ama alan yok'}');
+        if (got) {
+          src = src.isEmpty ? name : '$src+$name';
+          break; // bu kaynaktan alındı; eksik kalan varsa sıradaki kaynağa geç
+        }
+      } catch (e) {
+        lastError = e;
+        debugPrint('[Bilgi] "$q" · $name HATA: $e');
+      }
+    }
+  }
+  if (reached == 0 && lastError != null) throw Exception(lastError);
+  if (genre.isEmpty && year == 0 && trackNo == 0) return null;
+  return MetaHit(
+      genre: genre, year: year, trackNo: trackNo, discNo: discNo, source: src);
+}
+
+Future<List<_MetaCand>> _itunesMeta(String term, String country) async {
+  final data = await _getJson(
+    Uri.https('itunes.apple.com', '/search', {
+      'term': term,
+      'media': 'music',
+      'entity': 'song',
+      'limit': '10',
+      'country': country,
+    }),
+    3200,
+  );
+  final out = <_MetaCand>[];
+  for (final r in (data['results'] as List? ?? const [])) {
+    if (r is! Map) continue;
+    out.add(_MetaCand(
+      _Cand('${r['trackName'] ?? ''}', '${r['artistName'] ?? ''}',
+          '${r['collectionName'] ?? ''}', const []),
+      genre: '${r['primaryGenreName'] ?? ''}'.trim(),
+      year: _yearOf(r['releaseDate']),
+      trackNo: _asInt(r['trackNumber']),
+      discNo: _asInt(r['discNumber']),
+    ));
+  }
+  return out;
+}
+
+Future<List<_MetaCand>> _deezerMeta(String term) async {
+  final data = await _getJson(
+    Uri.https('api.deezer.com', '/search', {'limit': '8', 'q': term}),
+    300,
+  );
+  if (data is Map && data['error'] != null) {
+    throw Exception('Deezer: ${data['error']}');
+  }
+  final out = <_MetaCand>[];
+  for (final r in (data['data'] as List? ?? const [])) {
+    if (r is! Map) continue;
+    final album = r['album'] is Map ? r['album'] as Map : const {};
+    final artist = r['artist'] is Map ? r['artist'] as Map : const {};
+    final trackId = r['id'];
+    final albumId = album['id'];
+    out.add(_MetaCand(
+      _Cand('${r['title'] ?? ''}', '${artist['name'] ?? ''}',
+          '${album['title'] ?? ''}', const []),
+      // Arama sonucunda tür/yıl/sıra yok: sadece en iyi eşleşme için ek istek atılır
+      detail: (m) async {
+        try {
+          final t = await _getJson(Uri.https('api.deezer.com', '/track/$trackId'), 300);
+          if (t is Map && t['error'] == null) {
+            m.trackNo = _asInt(t['track_position']);
+            m.discNo = _asInt(t['disk_number']);
+            m.year = _yearOf(t['release_date']);
+          }
+        } catch (_) {}
+        try {
+          if (albumId != null) {
+            final a = await _getJson(Uri.https('api.deezer.com', '/album/$albumId'), 300);
+            if (a is Map && a['error'] == null) {
+              final g = a['genres'] is Map ? (a['genres'] as Map)['data'] : null;
+              if (g is List) {
+                for (final x in g) {
+                  if (x is Map && _asInt(x['id']) > 0) {
+                    final n = '${x['name'] ?? ''}'.trim();
+                    if (n.isNotEmpty) {
+                      m.genre = n;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (m.year == 0) m.year = _yearOf(a['release_date']);
+            }
+          }
+        } catch (_) {}
+      },
+    ));
+  }
+  return out;
+}
+
 // ------------------------------------------------------------ eşleştirme
 
 const _tr = {

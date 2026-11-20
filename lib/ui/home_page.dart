@@ -47,6 +47,23 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+          if (c.missingAudioCount > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Material(
+                color: kCard,
+                borderRadius: BorderRadius.circular(12),
+                child: ListTile(
+                  leading: const Icon(Icons.warning_amber_rounded,
+                      color: Colors.orangeAccent),
+                  title: Text('${c.missingAudioCount} şarkının ses dosyası yok'),
+                  subtitle: Text('Dosyaları seçip yeniden bağla',
+                      style: TextStyle(color: kText60, fontSize: 12)),
+                  trailing: Icon(Icons.chevron_right, color: kText38),
+                  onTap: () => openBackupPage(context),
+                ),
+              ),
+            ),
           if (recent.isNotEmpty)
             _SongShelf(title: 'Son çaldıkların', songs: recent),
           if (top.isNotEmpty)
@@ -61,10 +78,22 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: EdgeInsets.all(32),
               child: Center(
-                child: Text(
-                  'Henüz şarkı yok.\nKitaplığın sekmesinden şarkı ekle.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: kText60),
+                child: Column(
+                  children: [
+                    Text(
+                      'Henüz şarkı yok.\nKitaplığın sekmesinden şarkı ekle.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: kText60),
+                    ),
+                    if (c.restored && c.backupSupported) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => openBackupPage(context),
+                        icon: const Icon(Icons.restore),
+                        label: const Text('Yedekten geri yükle'),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),

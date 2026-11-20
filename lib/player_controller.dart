@@ -12,6 +12,8 @@ import 'package:just_audio/just_audio.dart';
 import 'app_theme.dart' show AppTheme;
 import 'audio_route_io.dart' if (dart.library.js_interop) 'audio_route_web.dart';
 import 'audio_url_stub.dart' if (dart.library.js_interop) 'audio_url_web.dart';
+import 'backup_stub.dart' if (dart.library.io) 'backup_io.dart';
+import 'backup_types.dart';
 import 'cover_lookup.dart';
 import 'cover_tint.dart';
 import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
@@ -49,8 +51,8 @@ class Song {
   Uint8List? cover; // gömülü ya da internetten bulunan kapak (jpeg/png baytları)
   Color? tint; // kapağın ortalama rengi
   CoverStatus coverStatus;
-  final String? path; // telefon/masaüstünde fayl yolu (hər açılışda yenidən tapılır)
-  final String? file; // telefonda tətbiq qovluğundakı fayl adı (bazada saxlanır)
+  String? path; // telefon/masaüstünde fayl yolu (hər açılışda yenidən tapılır)
+  String? file; // telefonda tətbiq qovluğundakı fayl adı (bazada saxlanır)
   Uint8List? bytes; // web'de dosya içeriği (bazadan lazım olanda yüklənir, sonra boşaldılır)
   final String ext;
   bool liked = false; // beğenilenler (yeşil tik)
@@ -659,10 +661,11 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         } catch (_) {}
         if (data != null) {
           final t = readTags(data, s.ext);
-          s.genre = t.genre;
-          s.year = t.year;
-          s.trackNo = t.track;
-          s.discNo = t.disc;
+          // Dosyada etiket yoksa internetten bulunmuş/elle girilmiş bilgi korunur
+          if (t.genre.isNotEmpty) s.genre = t.genre;
+          if (t.year > 0) s.year = t.year;
+          if (t.track > 0) s.trackNo = t.track;
+          if (t.disc > 0) s.discNo = t.disc;
           if (!s.gainTried) {
             s.gainDb = readReplayGain(data, s.ext); // eyni oxumada pulsuz
             s.gainTried = true;
@@ -1064,6 +1067,92 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  // ---- tür / yıl / albümdeki sırayı internetten bulma ----
+  bool metaRunning = false;
+  int metaDone = 0;
+  int metaTotal = 0;
+  String? metaNote; // son çalıştırmanın sonucu / uyarısı
+  bool _metaCancel = false;
+
+  void cancelMeta() => _metaCancel = true;
+
+  /// Türü, yılı ya da albümdeki sırası eksik şarkılar için internette arar ve yalnızca
+  /// EKSİK alanları doldurur (elle yazdığın ya da dosyadan okunan bilgi değişmez).
+  /// "Şarkı bilgilerini düzenle" ekranında bulunan değerler görünür.
+  Future<void> refreshMeta() async {
+    if (!kOnlineCovers || metaRunning) return;
+    bool needs(Song s) => s.genre.trim().isEmpty || s.year == 0 || s.trackNo == 0;
+    final todo = songs.where(needs).toList();
+    if (todo.isEmpty) {
+      metaNote = 'Tüm şarkıların türü, yılı ve sırası dolu';
+      notifyListeners();
+      return;
+    }
+
+    metaRunning = true;
+    metaDone = 0;
+    metaTotal = todo.length;
+    metaNote = null;
+    _metaCancel = false;
+    notifyListeners();
+
+    var updated = 0; // en az bir alanı dolan şarkı
+    var errors = 0; // art arda ağ hatası: bağlantı yok demektir
+    for (final s in todo) {
+      if (_metaCancel) break;
+      if (!songs.contains(s)) {
+        metaDone++;
+        continue;
+      }
+      try {
+        final hit = await findMeta(
+          title: s.title,
+          artist: s.artist == kUnknownArtist ? '' : s.artist,
+          needGenre: s.genre.trim().isEmpty,
+          needYear: s.year == 0,
+          needTrack: s.trackNo == 0,
+        );
+        errors = 0;
+        if (hit != null) {
+          var changed = false;
+          if (s.genre.trim().isEmpty && hit.genre.isNotEmpty) {
+            s.genre = hit.genre;
+            changed = true;
+          }
+          if (s.year == 0 && hit.year > 0) {
+            s.year = hit.year;
+            changed = true;
+          }
+          if (s.trackNo == 0 && hit.trackNo > 0) {
+            s.trackNo = hit.trackNo;
+            if (s.discNo == 0 && hit.discNo > 0) s.discNo = hit.discNo;
+            changed = true;
+          }
+          if (changed) {
+            updated++;
+            unawaited(_saveSong(s));
+          }
+        }
+      } catch (e) {
+        debugPrint('Bilgi aranamadı (${s.title}): $e');
+        errors++;
+        if (errors >= 3) {
+          metaNote = 'Bağlantı kurulamadı, arama durduruldu';
+          break;
+        }
+      }
+      metaDone++;
+      notifyListeners(); // bulundukça türler/liste kendiliğinden güncellenir
+    }
+
+    metaRunning = false;
+    metaNote ??= _metaCancel
+        ? 'Arama durduruldu'
+        : '$updated/${todo.length} şarkının bilgisi tamamlandı';
+    _metaCancel = false;
+    notifyListeners();
+  }
+
   // ---- şarkı bilgisini elle düzenleme ----
 
   /// Başlık, sanatçı, albüm ve (istenirse) kapağı günceller.
@@ -1372,6 +1461,161 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     loading = false;
     notifyListeners();
     unawaited(refreshCovers()); // etiketi olmayan şarkıların kapağını arka planda ara
+  }
+
+  // ================= yedekleme və bərpa =================
+
+  bool get backupSupported => !kIsWeb && CloudioStore.instance.enabled;
+
+  /// Ses dosyası telefonda bulunmayan şarkı sayısı (hafif yedekten sonra olur).
+  int get missingAudioCount =>
+      kIsWeb ? 0 : songs.where((s) => s.path == null).length;
+
+  /// Yedek almadan önce iki türün boyutunu hesaplar (ekranda gösterilir).
+  /// Veritabanı: şarkı bilgileri, kapaklar, sözler, janr/yıl/sıra, listeler, beğeniler,
+  /// istatistik, ayarlar, tema, profil, kuyruk.
+  Future<BackupPlan?> prepareBackup() async {
+    _saveQueueState();
+    _savePositionNow();
+    final db = await CloudioStore.instance.exportAll();
+    if (db == null) return null;
+    final json = jsonEncode(db);
+    final audio = await listAudioFiles();
+    var audioBytes = 0;
+    for (final a in audio) {
+      audioBytes += a.size;
+    }
+    return BackupPlan(
+      dbJson: json,
+      dbBytes: utf8.encode(json).length,
+      audioBytes: audioBytes,
+      audioCount: audio.length,
+      songCount: songs.length,
+      playlistCount: playlists.length,
+    );
+  }
+
+  /// Yedek dosyasını oluşturur, yolunu döndürür. [full]: şarkı dosyaları da dahil.
+  Future<String> createBackup(
+    BackupPlan plan, {
+    required bool full,
+    void Function(double progress)? onProgress,
+  }) =>
+      writeBackupFile(
+        dbJson: plan.dbJson,
+        full: full,
+        songCount: plan.songCount,
+        playlistCount: plan.playlistCount,
+        appVersion: kAppVersion,
+        onProgress: onProgress,
+      );
+
+  /// Yedek dosyasının başlığını okur (hiçbir şeyi değiştirmez). Geçersizse [BackupException].
+  Future<BackupManifest> inspectBackup(String path) => readBackupManifest(path);
+
+  /// Kitaplığı yedekten TAMAMEN değiştirir. Çağırmadan önce kullanıcıdan onay alınmalı.
+  /// Önce yedek geçici klasöre açılıp doğrulanır; hata olursa eski kitaplık korunur.
+  Future<void> restoreFromBackup(
+    String path, {
+    void Function(double progress, String stage)? onProgress,
+  }) async {
+    var wiped = false; // bellekteki kitaplık boşaltıldı, eskisi yeniden yüklenmeli olabilir
+    try {
+      onProgress?.call(0, 'Yedek açılıyor');
+      final staged = await extractBackup(path,
+          onProgress: (p) => onProgress?.call(p * 0.9, 'Yedek açılıyor'));
+
+      onProgress?.call(0.92, 'Eski kitaplık değiştiriliyor');
+      await _resetLibraryState();
+      wiped = true;
+      final swap = await swapInAudio(staged);
+      final ok = await CloudioStore.instance.replaceAll(staged.db);
+      if (!ok) {
+        await swap.rollback();
+        throw const BackupException(
+            'Veritabanı geri yüklenemedi. Eski kitaplığın korundu.');
+      }
+      await swap.commit();
+
+      onProgress?.call(0.97, 'Kitaplık yükleniyor');
+      wiped = false;
+      await _restore();
+      onProgress?.call(1, 'Tamamlandı');
+    } catch (_) {
+      if (wiped) await _restore(); // hata: eski kitaplığı geri yükle
+      rethrow;
+    } finally {
+      await deleteBackupTemp();
+      await deleteIfInTemp(path);
+    }
+  }
+
+  /// Bellekteki kitaplığı ve çalma durumunu boşaltır (geri yüklemeden hemen önce).
+  Future<void> _resetLibraryState() async {
+    _cancelFade();
+    _playToken++;
+    _markSong = null;
+    try {
+      await player.pause();
+    } catch (_) {}
+    songs.clear();
+    playlists.clear();
+    playLog.clear();
+    _queue = [];
+    currentIndex = null;
+    _order = [];
+    _pos = 0;
+    _lazySong = null;
+    queueName = 'Tüm Şarkılar';
+    shuffleMode = ShuffleMode.off;
+    repeatKind = RepeatKind.off;
+    restored = false;
+    notifyListeners();
+  }
+
+  /// Hafif yedekten sonra: seçilen dosyaları, adı ve boyutu aynı olan şarkılarla eşleştirir
+  /// (beğeni, liste, istatistik, söz hepsi olduğu gibi kalır). Bağlanan sayısını döndürür,
+  /// vazgeçildiyse null.
+  Future<int?> relinkMissingAudio() async {
+    final files = await FilePicker.pickFiles(type: FileType.any);
+    if (files.isEmpty) return null;
+
+    loading = true;
+    notifyListeners();
+    var linked = 0;
+    for (final f in files) {
+      try {
+        final p = f.path;
+        if (kIsWeb || p == null) continue;
+        final id = '${f.name}|${f.size}';
+        Song? target;
+        for (final s in songs) {
+          if (s.id == id && s.path == null) {
+            target = s;
+            break;
+          }
+        }
+        if (target == null) continue;
+        final dot = f.name.lastIndexOf('.');
+        final fileExt = dot > 0 ? f.name.substring(dot + 1).toLowerCase() : '';
+        final local = target.file ??
+            '${target.seq}.${target.ext.isEmpty ? fileExt : target.ext}';
+        final stored = await importAudioFile(sourcePath: p, fileName: local);
+        if (stored == null) continue;
+        final newPath = audioPathFor(stored);
+        if (newPath == null) continue;
+        target.file = stored;
+        target.path = newPath;
+        linked++;
+        unawaited(_saveSong(target));
+        notifyListeners();
+      } catch (e) {
+        debugPrint('Dosya bağlanamadı (${f.name}): $e');
+      }
+    }
+    loading = false;
+    notifyListeners();
+    return linked;
   }
 
   /// [context] verilirse sıra o liste olur (çalma listesi, beğenilenler...).
