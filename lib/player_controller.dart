@@ -1587,7 +1587,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       try {
         final p = f.path;
         if (kIsWeb || p == null) continue;
-        final id = '${f.name}|${f.size}';
+        final id = '${f.name}|${await backupFileSize(p)}';
         Song? target;
         for (final s in songs) {
           if (s.id == id && s.path == null) {
