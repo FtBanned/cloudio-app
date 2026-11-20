@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:just_audio/just_audio.dart' show ProcessingState;
 
 import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
@@ -9,8 +11,10 @@ import 'player_controller.dart';
 /// Kilid ekranı / Control Center / qulaqlıq düymələri ilə PlayerController arasında körpü.
 /// Çalma məntiqi (növbə, qarışdır, təkrar) hamısı PlayerController-də qalır:
 /// kilid ekranından gələn əmrlər sadəcə ora ötürülür.
-class CloudioAudioHandler extends BaseAudioHandler {
+class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
   CloudioAudioHandler(this._c) {
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_listenInterruptions());
     // Controller-in sabit axınları: crossfade zamanı aktiv pleyer dəyişsə də qırılmır
     _c.stateTick.listen((_) => _broadcast());
     _c.durationTick.listen((_) {
@@ -53,8 +57,42 @@ class CloudioAudioHandler extends BaseAudioHandler {
         ProcessingState.completed => AudioProcessingState.completed,
       };
 
+  // ---- kontroller kaybolursa kendini toparla ----
+  // iOS, bir süre sonra (kesinti, başka uygulamanın sesi, ses oturumu değişimi) Now Playing
+  // bilgisini silebilir. Eklenti aynı MediaItem tekrar gelmezse bilgiyi yeniden yazmıyor;
+  // bu yüzden şu anlarda mahnı bilgisi ve durum zorla yeniden yayınlanır:
+  //  - uygulama ön plana dönünce, - çalma yeniden başlayınca, - ses kesintisi bitince.
+  bool _wasPlaying = false;
+
+  void _reassert() {
+    final s = _c.current;
+    if (s != null) unawaited(_publishItem(s));
+    _broadcast();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _reassert();
+  }
+
+  Future<void> _listenInterruptions() async {
+    try {
+      final session = await AudioSession.instance;
+      session.interruptionEventStream.listen((e) {
+        if (!e.begin) _reassert();
+      });
+    } catch (_) {}
+  }
+
   void _broadcast() {
     final p = _c.player;
+    if (p.playing && !_wasPlaying) {
+      _wasPlaying = true;
+      final s = _c.current;
+      if (s != null) unawaited(_publishItem(s)); // çalma başladı: Now Playing'i yenile
+    } else if (!p.playing) {
+      _wasPlaying = false;
+    }
     // Sıranın sonunda "ileri" düyməsi kilid ekranında göstərilmir
     final controls = [
       MediaControl.skipToPrevious,

@@ -131,6 +131,9 @@ class CloudioStore {
   final _songs = stringMapStoreFactory.store('songs'); // yüngül məlumat + üzlük
   final _audio = stringMapStoreFactory.store('audio'); // səs faylının özü (base64)
   final _meta = stringMapStoreFactory.store('meta'); // çalma siyahıları
+  // Sözler ayrıca küçük bir kayıtta da tutulur: büyük şarkı kaydı (kapak dahil) yarım
+  // yazılsa ya da yazılamasa bile internetten bulunan/seçilen söz kaybolmasın.
+  final _lyrics = stringMapStoreFactory.store('lyrics');
   final _plays = intMapStoreFactory.store('plays'); // dinləmə tarixçəsi (statistika)
 
   Future<void> open() async {
@@ -183,12 +186,33 @@ class CloudioStore {
     if (db == null) return null;
     try {
       final songSnaps = await _songs.find(db);
+      final lyricById = <String, Map<String, Object?>>{};
+      try {
+        for (final r in await _lyrics.find(db)) {
+          lyricById[r.key] = r.value;
+        }
+      } catch (e) {
+        debugPrint('[Cloudio DB] söz deposu okunamadı: $e');
+      }
       final result = <SavedSong>[];
       for (final snap in songSnaps) {
         try {
           final m = snap.value;
           final id = snap.key;
           final coverB64 = m['cover'] as String?;
+          // Söz deposunda kayıt varsa o geçerli (daha güvenilir ve daha yeni)
+          final extra = lyricById[id];
+          final Lyrics? lyr;
+          final bool lyrNotFound;
+          if (extra != null) {
+            lyr = extra['l'] == null
+                ? null
+                : (_lyricsFromMap(extra['l']) ?? _lyricsFromMap(m['lyrics']));
+            lyrNotFound = extra['nf'] as bool? ?? false;
+          } else {
+            lyr = _lyricsFromMap(m['lyrics']);
+            lyrNotFound = m['lyricsNotFound'] as bool? ?? false;
+          }
           result.add(SavedSong(
             id: id,
             seq: m['seq'] as int? ?? 0,
@@ -199,8 +223,8 @@ class CloudioStore {
             liked: m['liked'] as bool? ?? false,
             coverStatus: m['coverStatus'] as int? ?? 0,
             cover: coverB64 == null ? null : base64Decode(coverB64),
-            lyrics: _lyricsFromMap(m['lyrics']),
-            lyricsNotFound: m['lyricsNotFound'] as bool? ?? false,
+            lyrics: lyr,
+            lyricsNotFound: lyrNotFound,
             file: m['file'] as String?,
             durationMs: m['dur'] as int?,
             playCount: m['plays'] as int? ?? 0,
@@ -321,6 +345,27 @@ class CloudioStore {
     }
   }
 
+  /// Bir şarkının sözünü (ya da "bulunamadı" işaretini) küçük ayrı kayıtta saklar.
+  /// Yazılamazsa kısa bir beklemeyle bir kez daha dener. Başarılıysa true döner.
+  Future<bool> saveLyrics(String id, Lyrics? lyrics,
+      {required bool notFound}) async {
+    final db = _db;
+    if (db == null) return false;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await _lyrics.record(id).put(db, <String, Object?>{
+          'l': lyrics == null ? null : _lyricsToMap(lyrics),
+          'nf': notFound,
+        });
+        return true;
+      } catch (e) {
+        debugPrint('[Cloudio DB] söz yazılamadı ($id): $e');
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    }
+    return false;
+  }
+
   Future<void> deleteSong(String id) async {
     final db = _db;
     if (db == null) return;
@@ -328,6 +373,7 @@ class CloudioStore {
       await db.transaction((txn) async {
         await _songs.record(id).delete(txn);
         await _audio.record(id).delete(txn);
+        await _lyrics.record(id).delete(txn);
       });
     } catch (e) {
       debugPrint('[Cloudio DB] silinə bilmədi ($id): $e');

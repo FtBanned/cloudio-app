@@ -1,3 +1,5 @@
+import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -645,13 +647,14 @@ class _AdminBackdropState extends State<_AdminBackdrop>
 
   Future<void> _initVideo() async {
     try {
-      final vc = VideoPlayerController.asset(
-        'assets/admin_bg.mp4',
-        // Müziği kesmesin: ses oturumu diğer seslerle karışsın
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-      );
+      // ÖNEMLİ: videoPlayerOptions(mixWithOthers: true) VERMİYORUZ. iOS'ta bu seçenek
+      // uygulamanın ortak ses oturumunu "diğer seslerle karışır" moduna alıyor; iOS de
+      // bu modda kilit ekranı / Control Center müzik kontrollerini göstermiyor (bir süre
+      // sonra kayboluyordu). Video zaten sessiz ve içinde ses kanalı yok, müziği kesmez.
+      final vc = VideoPlayerController.asset('assets/admin_bg.mp4');
       _vc = vc;
       await vc.initialize();
+      await _restoreMusicSession();
       if (_gone) return; // dispose() controller'ı zaten kapattı
       await vc.setVolume(0);
       await vc.setLooping(true);
@@ -660,6 +663,19 @@ class _AdminBackdropState extends State<_AdminBackdrop>
       _syncPlayback();
     } catch (e) {
       debugPrint('Admin fon videosu açılmadı: $e');
+    }
+  }
+
+  /// Video eklentisi ses oturumunun kategorisini değiştirmiş olabilir; müzik çalar için
+  /// gereken (karışmayan, "playback") ayarı geri yükler. Oturumu etkinleştirmez,
+  /// yani başka uygulamanın sesini kesmez.
+  Future<void> _restoreMusicSession() async {
+    if (kIsWeb) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+    } catch (e) {
+      debugPrint('Ses oturumu geri yüklenemedi: $e');
     }
   }
 

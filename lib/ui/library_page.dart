@@ -41,13 +41,13 @@ class _LibraryPageState extends State<LibraryPage> {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                   ),
-                  if (kOnlineCovers)
+                  if (kOnlineCovers || kOnlineLyrics)
                     IconButton(
                       icon: Icon(c.coversRunning ? Icons.close : Icons.refresh,
                           size: 26),
                       tooltip: c.coversRunning
-                          ? 'Kapak aramasını durdur'
-                          : 'Listeyi yenile (eksik kapakları bul)',
+                          ? 'Aramayı durdur'
+                          : 'Listeyi yenile (eksik kapak ve sözleri bul)',
                       onPressed: c.coversRunning
                           ? c.cancelCovers
                           : () => c.refreshCovers(retryNone: true),
@@ -78,7 +78,7 @@ class _LibraryPageState extends State<LibraryPage> {
                           : c.coversDone / c.coversTotal,
                     ),
                     const SizedBox(height: 4),
-                    Text('Kapaklar aranıyor… ${c.coversDone}/${c.coversTotal}',
+                    Text('Kapaklar ve sözler aranıyor… ${c.coversDone}/${c.coversTotal}',
                         style: TextStyle(
                             fontSize: 12, color: kText60)),
                   ],

@@ -22,8 +22,10 @@ Future<void> showLyricsSearch(BuildContext context, Song song) async {
     isScrollControlled: true,
     builder: (_) => _LyricsSearchSheet(initial: initial),
   );
-  if (picked == null || !context.mounted) return;
+  if (picked == null) return;
+  // Söz, sayfa kapanmış olsa bile mutlaka kaydedilir; sadece bildirim context ister
   PlayerController.instance.setLyrics(song, picked.lyrics);
+  if (!context.mounted) return;
   ScaffoldMessenger.of(context)
       .showSnackBar(const SnackBar(content: Text('Şarkı sözü eklendi')));
 }

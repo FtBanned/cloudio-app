@@ -343,6 +343,12 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       ]);
   }
 
+  /// Sözü (ya da "bulunamadı" işaretini) şarkının büyük kaydından bağımsız olarak saklar.
+  void _saveLyrics(Song s) {
+    unawaited(CloudioStore.instance.saveLyrics(s.id, s.lyrics,
+        notFound: s.lyricsStatus == LyricsStatus.notFound));
+  }
+
   Future<bool> _saveSong(Song s, {bool withAudio = false}) {
     return CloudioStore.instance.saveSong(
       id: s.id,
@@ -945,18 +951,30 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
   void cancelCovers() => _coversCancel = true;
 
-  /// Kapağı olmayan şarkılar için tek tek (limitlere uyarak) arama yapar.
+  /// Kapağı ya da sözü eksik şarkılar için tek tek (limitlere uyarak) internette arar.
+  /// Yeni şarkı eklenince, uygulama açılınca ve "Listeyi yenile" tuşunda çalışır.
+  /// Her şarkıda önce kapak, sonra söz aranır (kapak aramasında ad/sanatçı düzelirse
+  /// söz aramasında düzeltilmiş bilgi kullanılır).
   /// [retryNone]: daha önce "bulunamadı" işaretlenenleri de tekrar dener (manuel yenile).
   Future<void> refreshCovers({bool retryNone = false}) async {
-    if (!kOnlineCovers || coversRunning) return;
-    final todo = songs
-        .where((s) =>
-            s.cover == null &&
-            (s.coverStatus == CoverStatus.idle ||
-                (retryNone && s.coverStatus == CoverStatus.none)))
-        .toList();
+    if (coversRunning) return;
+
+    bool needsCover(Song s) =>
+        kOnlineCovers &&
+        s.cover == null &&
+        (s.coverStatus == CoverStatus.idle ||
+            (retryNone && s.coverStatus == CoverStatus.none));
+    bool needsLyrics(Song s) =>
+        kOnlineLyrics &&
+        s.lyrics == null &&
+        (s.lyricsStatus == LyricsStatus.idle ||
+            (retryNone &&
+                (s.lyricsStatus == LyricsStatus.notFound ||
+                    s.lyricsStatus == LyricsStatus.error)));
+
+    final todo = songs.where((s) => needsCover(s) || needsLyrics(s)).toList();
     if (todo.isEmpty) {
-      coversNote = retryNone ? 'Kapağı eksik şarkı yok' : null;
+      coversNote = retryNone ? 'Eksik kapak ya da söz yok' : null;
       notifyListeners();
       return;
     }
@@ -968,56 +986,79 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     _coversCancel = false;
     notifyListeners();
 
-    var found = 0;
+    var foundCovers = 0;
+    var foundLyrics = 0;
     var errors = 0; // art arda ağ hatası: bağlantı yok demektir, boşuna beklemeyelim
+    var stop = false;
     for (final s in todo) {
-      if (_coversCancel) break;
+      if (_coversCancel || stop) break;
       if (!songs.contains(s)) {
         coversDone++;
         continue;
       }
-      try {
-        final hit = await findCover(
-          title: s.title,
-          artist: s.artist == kUnknownArtist ? '' : s.artist,
-          album: s.album,
-        );
-        errors = 0;
-        if (hit == null) {
-          s.coverStatus = CoverStatus.none;
-          unawaited(_saveSong(s));
-        } else {
-          s.cover = hit.bytes;
-          s.tint = await coverTint(hit.bytes);
-          s.coverStatus = CoverStatus.found;
-          if (s.album.isEmpty) s.album = hit.album;
-          if (hit.swapped && hit.title.isNotEmpty && hit.artist.isNotEmpty) {
-            s.title = hit.title; // ad ilə sənətçi yer dəyişmişdi: düzəlt
-            s.artist = hit.artist;
-          } else if (s.artist == kUnknownArtist && hit.artist.isNotEmpty) {
-            s.artist = hit.artist; // etiketsiz dosya: doğru sanatçıyı/adı al
-            if (hit.title.isNotEmpty) s.title = hit.title;
+
+      // ---- kapak ----
+      if (needsCover(s)) {
+        try {
+          final hit = await findCover(
+            title: s.title,
+            artist: s.artist == kUnknownArtist ? '' : s.artist,
+            album: s.album,
+          );
+          errors = 0;
+          if (hit == null) {
+            s.coverStatus = CoverStatus.none;
+            unawaited(_saveSong(s));
+          } else {
+            s.cover = hit.bytes;
+            s.tint = await coverTint(hit.bytes);
+            s.coverStatus = CoverStatus.found;
+            if (s.album.isEmpty) s.album = hit.album;
+            if (hit.swapped && hit.title.isNotEmpty && hit.artist.isNotEmpty) {
+              s.title = hit.title; // ad ilə sənətçi yer dəyişmişdi: düzəlt
+              s.artist = hit.artist;
+            } else if (s.artist == kUnknownArtist && hit.artist.isNotEmpty) {
+              s.artist = hit.artist; // etiketsiz dosya: doğru sanatçıyı/adı al
+              if (hit.title.isNotEmpty) s.title = hit.title;
+            }
+            foundCovers++;
+            unawaited(_saveSong(s));
           }
-          found++;
-          unawaited(_saveSong(s));
-        }
-      } catch (e) {
-        debugPrint('Kapak aranamadı (${s.title}): $e');
-        errors++; // durum idle kalır: sonra tekrar denenebilir
-        if (errors >= 3) {
-          coversNote = 'Bağlantı kurulamadı, kapak araması durduruldu ($e)';
-          break;
+        } catch (e) {
+          debugPrint('Kapak aranamadı (${s.title}): $e');
+          errors++; // durum idle kalır: sonra tekrar denenebilir
+          if (errors >= 3) {
+            coversNote = 'Bağlantı kurulamadı, arama durduruldu ($e)';
+            stop = true;
+          }
         }
       }
+
+      // ---- şarkı sözü ----
+      if (!stop && !_coversCancel && needsLyrics(s)) {
+        // idle dışındaki durumlarda (bulunamadı / hata) loadLyricsOnline ancak force ile arar
+        await loadLyricsOnline(s, force: s.lyricsStatus != LyricsStatus.idle);
+        if (s.lyricsStatus == LyricsStatus.error) {
+          errors++;
+          if (errors >= 3) {
+            coversNote = 'Bağlantı kurulamadı, arama durduruldu';
+            stop = true;
+          }
+        } else {
+          errors = 0;
+          if (s.lyrics != null) foundLyrics++;
+        }
+      }
+
       coversDone++;
-      notifyListeners(); // kapak geldikçe liste kendiliğinden güncellenir
+      notifyListeners(); // kapak/söz geldikçe liste kendiliğinden güncellenir
     }
 
     coversRunning = false;
     if (coversNote == null) {
       coversNote = _coversCancel
-          ? 'Kapak araması durduruldu'
-          : '$found/${todo.length} şarkının kapağı bulundu';
+          ? 'Arama durduruldu'
+          : '$foundCovers kapak, $foundLyrics söz bulundu (${todo.length} şarkı tarandı)';
     }
     _coversCancel = false;
     notifyListeners();
@@ -1093,6 +1134,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       if (l == null) return false;
       s.lyrics = l;
       s.lyricsStatus = LyricsStatus.found;
+      _saveLyrics(s);
       unawaited(_saveSong(s));
       notifyListeners();
       return true;
@@ -1132,7 +1174,10 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('Söz aranamadı (${s.title}): $e');
       s.lyricsStatus = LyricsStatus.error; // ağ hatası: tekrar denenebilir
     }
-    if (s.lyricsStatus != LyricsStatus.error) unawaited(_saveSong(s));
+    if (s.lyricsStatus != LyricsStatus.error) {
+      _saveLyrics(s);
+      unawaited(_saveSong(s));
+    }
     notifyListeners();
   }
 
@@ -1140,6 +1185,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   void setLyrics(Song s, Lyrics l) {
     s.lyrics = l;
     s.lyricsStatus = LyricsStatus.found;
+    _saveLyrics(s);
     unawaited(_saveSong(s));
     notifyListeners();
   }
@@ -1147,6 +1193,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   void clearLyrics(Song s) {
     s.lyrics = null;
     s.lyricsStatus = LyricsStatus.notFound; // kullanıcı kaldırdı: kendiliğinden tekrar aranmasın
+    _saveLyrics(s);
     unawaited(_saveSong(s));
     notifyListeners();
   }
