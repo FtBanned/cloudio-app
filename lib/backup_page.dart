@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'backup_stub.dart' if (dart.library.io) 'backup_io.dart' show backupFileSize;
+import 'backup_reminder.dart';
 import 'backup_types.dart';
 import 'main.dart' show kBg, kCard, kGreen, kText38, kText54, kText60, kText70;
 import 'player_controller.dart';
@@ -54,10 +55,16 @@ class BackupPage extends StatelessWidget {
                 style: TextStyle(color: kText54, fontSize: 12, height: 1.4),
               ),
               const SizedBox(height: 16),
-              if (!c.backupSupported)
+              if (!c.backupSupported) ...[
                 Text('Yedekleme bu platformda kullanılamıyor.',
-                    style: TextStyle(color: kText60))
-              else ...[
+                    style: TextStyle(color: kText60)),
+                if (kBackupReminderWebTest) ...[
+                  const SizedBox(height: 10),
+                  const BackupReminderSettings(),
+                ],
+              ] else ...[
+                const BackupReminderSettings(),
+                const SizedBox(height: 10),
                 _ActionCard(
                   icon: Icons.cloud_upload_outlined,
                   title: 'Yedek oluştur',
@@ -224,6 +231,7 @@ class BackupPage extends StatelessWidget {
         }),
       );
       size = await backupFileSize(path);
+      BackupReminder.instance.markBackedUp(); // xatırlatma sayğacı sıfırlanır
     } catch (e) {
       _snack(context, _err(e));
       return;
@@ -315,6 +323,8 @@ class BackupPage extends StatelessWidget {
       _snack(context, _err(e));
       return;
     }
+    // bərpa olunan yedəyin tarixi "son yedək" sayılır
+    BackupReminder.instance.markBackedUp(atMs: manifest.createdMs);
     if (!context.mounted) return;
 
     final missing = c.missingAudioCount;

@@ -64,6 +64,8 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+          const BackupReminderBanner(),
+          if (!_musicOnly) const ThrowbackCard(),
           if (recent.isNotEmpty)
             _SongShelf(title: 'Son çaldıkların', songs: recent),
           if (top.isNotEmpty)

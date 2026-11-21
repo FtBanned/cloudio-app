@@ -11,16 +11,20 @@ import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'app_theme.dart';
 import 'audio_handler.dart';
 import 'backup_page.dart' show openBackupPage;
+import 'backup_reminder.dart';
 import 'cover_tint.dart' show CoverPalette, coverPalette;
 import 'cover_lookup.dart'
     show CoverCandidate, fetchCoverImage, kOnlineCovers, searchCandidates;
 import 'lyrics.dart';
+import 'lyrics_share.dart';
+import 'onboarding.dart';
 import 'booster.dart';
 import 'booster_page.dart';
 import 'player_controller.dart';
 import 'queue_page.dart';
 import 'settings_page.dart';
 import 'soloud_engine.dart';
+import 'throwback.dart';
 
 part 'ui/cover_background.dart';
 part 'ui/library_sort.dart';

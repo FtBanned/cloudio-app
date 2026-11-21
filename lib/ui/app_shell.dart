@@ -138,6 +138,15 @@ class _MainShellState extends State<MainShell> {
 
   final _pages = const [HomePage(), SearchPage(), LibraryPage()];
 
+  @override
+  void initState() {
+    super.initState();
+    // İlk quraşdırmada qarşılama ekranı (yalnız təzə, boş kitabxanada)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(maybeShowOnboarding(context));
+    });
+  }
+
   void _onTap(int i) {
     if (i == 3) {
       if (_createOpen) {

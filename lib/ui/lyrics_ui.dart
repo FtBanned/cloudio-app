@@ -273,6 +273,15 @@ void showLyricsMenu(BuildContext context, Song song) {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (song.lyrics != null)
+            ListTile(
+              leading: const Icon(Icons.ios_share),
+              title: const Text('Söz kartı oluştur ve paylaş'),
+              onTap: () {
+                Navigator.pop(ctx);
+                openLyricsShare(context, song);
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.upload_file),
             title: const Text('Söz dosyası ekle (.lrc / .txt)'),
@@ -562,6 +571,13 @@ class LyricsPage extends StatelessWidget {
                                     fontSize: 12, color: Colors.white70)),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.ios_share),
+                        tooltip: 'Söz kartı',
+                        onPressed: song.lyrics == null
+                            ? null
+                            : () => openLyricsShare(context, song),
                       ),
                       IconButton(
                         icon: const Icon(Icons.more_horiz),

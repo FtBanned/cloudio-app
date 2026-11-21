@@ -594,6 +594,52 @@ class CloudioStore {
     }
   }
 
+  // ---- qarşılama ekranı ("artıq göstərilib" bayrağı) ----
+  Future<void> saveOnboardingSeen() async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('onboarding').put(db, <String, Object?>{'seen': true});
+    } catch (e) {
+      debugPrint('[Cloudio DB] qarşılama bayrağı yazıla bilmədi: $e');
+    }
+  }
+
+  Future<bool> loadOnboardingSeen() async {
+    final db = _db;
+    if (db == null) return true;
+    try {
+      final m = await _meta.record('onboarding').get(db);
+      return m != null && m['seen'] == true;
+    } catch (e) {
+      debugPrint('[Cloudio DB] qarşılama bayrağı oxunmadı: $e');
+      return true; // xəta olarsa narahat etmə
+    }
+  }
+
+  // ---- yedək xatırlatması (son yedək vaxtı, təxirə salma, həftə sayı) ----
+  Future<void> saveBackupInfo(Map<String, Object?> data) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('backupinfo').put(db, data);
+    } catch (e) {
+      debugPrint('[Cloudio DB] yedək məlumatı yazıla bilmədi: $e');
+    }
+  }
+
+  Future<Map<String, Object?>?> loadBackupInfo() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('backupinfo').get(db);
+      return m == null ? null : Map<String, Object?>.of(m);
+    } catch (e) {
+      debugPrint('[Cloudio DB] yedək məlumatı oxunmadı: $e');
+      return null;
+    }
+  }
+
   // ---- dinləmə tarixçəsi (Şəxsi statistika) ----
   Future<void> addPlay(PlayEvent e) async {
     final db = _db;

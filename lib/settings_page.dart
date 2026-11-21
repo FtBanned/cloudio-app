@@ -19,6 +19,7 @@ import 'main.dart'
 import 'backup_page.dart';
 import 'booster.dart';
 import 'booster_page.dart';
+import 'onboarding.dart';
 import 'player_controller.dart';
 import 'stats_page.dart';
 
@@ -194,6 +195,12 @@ class SettingsPage extends StatelessWidget {
 
             // ---------- Hakkında ----------
             const _SectionTitle('Hakkında'),
+            ListTile(
+              leading: Icon(Icons.help_outline, color: kText70),
+              title: const Text('Tanıtımı yeniden göster'),
+              trailing: Icon(Icons.chevron_right, color: kText38),
+              onTap: () => openOnboarding(context),
+            ),
             ListTile(
               leading: Icon(Icons.info_outline, color: kText70),
               title: Text('Cloudio'),
