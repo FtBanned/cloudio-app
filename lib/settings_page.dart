@@ -17,6 +17,8 @@ import 'main.dart'
         formatTotal,
         showSleepSheet;
 import 'backup_page.dart';
+import 'booster.dart';
+import 'booster_page.dart';
 import 'player_controller.dart';
 import 'stats_page.dart';
 
@@ -86,6 +88,21 @@ class SettingsPage extends StatelessWidget {
                       onTap: () => c.setSpeed(v),
                     ),
                 ],
+              ),
+            ),
+            ListenableBuilder(
+              listenable: Booster.instance,
+              builder: (context, _) => ListTile(
+                leading: Icon(Icons.graphic_eq, color: kGreen),
+                title: const Text('Ses güçlendirici'),
+                subtitle: Text(
+                    Booster.instance.enabled
+                        ? 'Açık: ${Booster.instance.label} • '
+                            '${Booster.kClarityNames[Booster.instance.clarity]}'
+                        : 'Kapalı • 2x–10x güçlendirme ve netlik',
+                    style: TextStyle(color: kText54, fontSize: 12)),
+                trailing: Icon(Icons.chevron_right, color: kText38),
+                onTap: () => openBoosterPage(context),
               ),
             ),
             if (c.crossfadeSupported)

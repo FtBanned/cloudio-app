@@ -571,6 +571,29 @@ class CloudioStore {
     }
   }
 
+  // ---- səs gücləndirici ayarları ----
+  Future<void> saveBooster(Map<String, Object?> data) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _meta.record('booster').put(db, data);
+    } catch (e) {
+      debugPrint('[Cloudio DB] gücləndirici yazıla bilmədi: $e');
+    }
+  }
+
+  Future<Map<String, Object?>?> loadBooster() async {
+    final db = _db;
+    if (db == null) return null;
+    try {
+      final m = await _meta.record('booster').get(db);
+      return m == null ? null : Map<String, Object?>.of(m);
+    } catch (e) {
+      debugPrint('[Cloudio DB] gücləndirici oxunmadı: $e');
+      return null;
+    }
+  }
+
   // ---- dinləmə tarixçəsi (Şəxsi statistika) ----
   Future<void> addPlay(PlayEvent e) async {
     final db = _db;

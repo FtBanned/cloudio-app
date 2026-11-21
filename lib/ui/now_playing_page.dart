@@ -304,6 +304,7 @@ class NowPlayingPage extends StatelessWidget {
                     Row(
                       children: [
                         const _SleepTimerButton(),
+                        const _BoosterButton(),
                         IconButton(
                           tooltip: 'Çalma ayarları',
                           icon: const Icon(Icons.tune),
@@ -626,6 +627,27 @@ class SeekBar extends StatelessWidget {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+
+/// Səs gücləndirici: şarkı ekranında sürətli aç (1x..10x, aydınlıq).
+class _BoosterButton extends StatelessWidget {
+  const _BoosterButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Booster.instance,
+      builder: (context, _) {
+        final on = Booster.instance.enabled;
+        return IconButton(
+          tooltip: 'Ses güçlendirici',
+          icon: Icon(Icons.graphic_eq, color: on ? kGreen : null),
+          onPressed: () => showBoosterSheet(context),
         );
       },
     );
