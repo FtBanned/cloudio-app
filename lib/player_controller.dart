@@ -19,6 +19,7 @@ import 'cover_tint.dart';
 import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
 import 'lyrics.dart';
 import 'persistence.dart';
+import 'soloud_engine.dart' show SoloudEngine;
 import 'soloud_player.dart';
 import 'tag_reader.dart';
 
@@ -145,6 +146,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (!_autoPausedByRoute) return;
     _autoPausedByRoute = false;
     await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (_userPaused || player.playing || current == null) return;
+    // iOS qulaqlıq dəyişəndən sonra səs cihazı səssiz qala bilir: davam etməzdən əvvəl yenilə
+    await SoloudEngine.instance.restartDevice();
     if (_userPaused || player.playing || current == null) return;
     play();
   }

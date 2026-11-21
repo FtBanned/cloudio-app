@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'dart:async' show StreamSubscription, unawaited;
+
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_soloud/flutter_soloud.dart';
 
 String? _lastAudioLog;
@@ -29,8 +31,39 @@ class SoloudEngine {
     try {
       await SoLoud.instance.init();
       ready = true;
+      // Çıxış cihazı avtomatik başlamasa (məs. iOS-da qulaqlıq dəyişəndən sonra),
+      // səssiz qalmasın deyə cihazı yenidən başlatmağa cəhd edirik.
+      await _failSub?.cancel();
+      _failSub = SoLoud.instance.audioDeviceStartFailures.listen((e) {
+        audioLog('səs cihazı avtomatik başlamadı', e);
+        unawaited(restartDevice());
+      });
     } catch (e) {
       debugPrint('[Cloudio] SoLoud başlamadı: $e');
+    }
+  }
+
+  StreamSubscription<dynamic>? _failSub;
+  bool _restarting = false;
+
+  /// Çıxış cihazını dayandırıb yenidən başladır. Yüklənmiş mahnılar, cari pozisiya və
+  /// filtrlər qalır. Qulaqlıq çıxıb-taxılandan sonra iOS-da cihaz səssiz qala bilir.
+  Future<void> restartDevice() async {
+    if (!ready || kIsWeb || _restarting) return;
+    _restarting = true;
+    try {
+      try {
+        await SoLoud.instance.stopAudioDevice();
+      } catch (e) {
+        audioLog('stopAudioDevice', e);
+      }
+      try {
+        await SoLoud.instance.startAudioDevice();
+      } catch (e) {
+        audioLog('startAudioDevice', e);
+      }
+    } finally {
+      _restarting = false;
     }
   }
 
