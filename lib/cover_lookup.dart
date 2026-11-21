@@ -157,8 +157,105 @@ Future<CoverHit?> findCover({
       }
     }
   }
+  // Sərt yoxlama heç nə tapmadı: əl ilə axtarışdakı kimi yumşaq ehtiyat axtarış.
+  // (Heç bir mənbəyə çatılmayıbsa internet yoxdur, boşuna gözləmirik.)
+  if (reached > 0) {
+    try {
+      final fb = await _fallbackCover(title: title, artist: artist);
+      if (fb != null) return fb;
+    } catch (e) {
+      debugPrint('[Kapak] ehtiyat axtarış xətası: $e');
+    }
+  }
   if (reached == 0 && lastError != null) throw Exception(lastError);
   return null;
+}
+
+/// Ehtiyat axtarış. Fayl adı təmizlənmədən, həm "ad sənətçi", həm "sənətçi ad" sırası ilə
+/// Deezer və iTunes-da axtarır; sözlərin sırasına və ad/sənətçi yerinə baxmır (əl ilə
+/// axtarışdakı kimi), yalnız daha yumşaq eşiklə yoxlayır. Ad ilə sənətçi dəyişik
+/// yazılıbsa (Mahnı - Sənətçi) [CoverHit.swapped] true olur və tətbiq onları düzəldir.
+Future<CoverHit?> _fallbackCover({
+  required String title,
+  required String artist,
+}) async {
+  final rawT = tidyName(title);
+  final rawA = artist.isEmpty ? '' : tidyName(artist);
+  final tTok = _tokens(rawT);
+  final aTok = _tokens(rawA);
+  if (tTok.isEmpty && aTok.isEmpty) return null;
+
+  final seen = <String>{};
+  final queries = <String>[
+    for (final q in [
+      rawA.isEmpty ? rawT : '$rawT $rawA',
+      if (rawA.isNotEmpty) '$rawA $rawT',
+      cleanForSearch(rawA.isEmpty ? rawT : '$rawT $rawA'),
+    ])
+      if (q.trim().isNotEmpty && seen.add(_norm(q))) q.trim(),
+  ];
+
+  // (mənbə adı, sorğu, funksiya): iTunes yavaşdır, ona görə az sorğu
+  final calls = <(String, String, Future<List<_Cand>> Function())>[
+    for (final q in queries.take(3)) ('Deezer', q, () => _deezer(q, limit: 15)),
+    for (final q in queries.take(2)) ('iTunes-tr', q, () => _itunes(q, 'tr', limit: 12)),
+    if (queries.isNotEmpty) ('iTunes-us', queries.first, () => _itunes(queries.first, 'us', limit: 8)),
+  ];
+
+  for (final (name, q, fetch) in calls) {
+    try {
+      final cands = await fetch();
+      final scored = <(double, bool, _Cand)>[];
+      for (final c in cands) {
+        final m = _looseMatch(c, tTok, aTok);
+        if (m != null) scored.add((m.$1, m.$2, c));
+      }
+      scored.sort((x, y) => y.$1.compareTo(x.$1));
+      debugPrint(
+          '[Kapak] ehtiyat "$q" · $name: ${cands.length} sonuç, ${scored.length} uygun');
+      for (final (score, swapped, c) in scored.take(5)) {
+        for (final url in c.arts) {
+          final img = await _getImage(url);
+          if (img != null) {
+            debugPrint(
+                '[Kapak] ehtiyat "$q" · $name: BULUNDU (${score.toStringAsFixed(2)}, '
+                '${c.artist} - ${c.title})');
+            return CoverHit(img, c.title, c.artist, c.album, 'ehtiyat-$name',
+                swapped: swapped, score: score);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Kapak] ehtiyat "$q" · $name HATA: $e');
+    }
+  }
+  return null;
+}
+
+/// Yumşaq uyğunluq: adayın başlığı girişdə (ad+sənətçi sözləri birlikdə) olmalı, giriş
+/// də adayın (sənətçi+başlıq) mətninin əksəriyyətində olmalıdır. Sıra və ad/sənətçi yeri
+/// fərq etmir. (bal, ad/sənətçi dəyişikdir) və ya uyğun deyilsə null.
+(double, bool)? _looseMatch(_Cand c, List<String> tTok, List<String> aTok) {
+  final ct = _tokens(c.title);
+  final ca = _tokens(c.artist);
+  if (ct.isEmpty) return null;
+  final input = [...tTok, ...aTok];
+  if (input.isEmpty) return null;
+
+  final titleIn = _coverage(ct, input); // adayın başlığı girişdə varmı
+  final inputIn = _coverage(input, [...ca, ...ct]); // giriş adayda varmı
+  if (titleIn < 0.8) return null;
+  if (aTok.isEmpty) {
+    if (inputIn < 0.85) return null; // sənətçi bilinmir: daha ehtiyatlı ol
+  } else {
+    if (inputIn < 0.6) return null;
+    if (ca.isNotEmpty && _coverage(ca, input) < 0.5) return null; // sənətçi uyğun deyil
+  }
+  final score = 0.5 * titleIn + 0.5 * inputIn;
+  if (score < 0.7) return null;
+  // adayın başlığı "sənətçi" sahəsinə daha çox oxşayırsa, ad ilə sənətçi yer dəyişib
+  final swapped = aTok.isNotEmpty && _coverage(ct, aTok) > _coverage(ct, tTok);
+  return (score, swapped);
 }
 
 /// Elle arama: serbest metinle Deezer + iTunes sonuçlarını listeler (eşleştirme yok,
