@@ -70,6 +70,26 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
     _broadcast();
   }
 
+  // Çalarkən arxa planda hər 10 saniyədən bir Now Playing-i yenidən yazırıq və ses oturumunu
+  // aktiv saxlayırıq: iOS bəzən bir müddət sonra Control Center / kilid ekranı kartını silir.
+  Timer? _keepAlive;
+
+  void _startKeepAlive() {
+    _keepAlive ??= Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!_c.player.playing) return;
+      try {
+        final session = await AudioSession.instance;
+        await session.setActive(true);
+      } catch (_) {}
+      _reassert();
+    });
+  }
+
+  void _stopKeepAlive() {
+    _keepAlive?.cancel();
+    _keepAlive = null;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _reassert();
@@ -88,10 +108,12 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
     final p = _c.player;
     if (p.playing && !_wasPlaying) {
       _wasPlaying = true;
+      _startKeepAlive();
       final s = _c.current;
       if (s != null) unawaited(_publishItem(s)); // çalma başladı: Now Playing'i yenile
     } else if (!p.playing) {
       _wasPlaying = false;
+      _stopKeepAlive();
     }
     // Sıranın sonunda "ileri" düyməsi kilid ekranında göstərilmir
     final controls = [
