@@ -15,9 +15,12 @@ import 'cover_tint.dart' show CoverPalette, coverPalette;
 import 'cover_lookup.dart'
     show CoverCandidate, fetchCoverImage, kOnlineCovers, searchCandidates;
 import 'lyrics.dart';
+import 'booster.dart';
+import 'booster_page.dart';
 import 'player_controller.dart';
 import 'queue_page.dart';
 import 'settings_page.dart';
+import 'soloud_engine.dart';
 
 part 'ui/cover_background.dart';
 part 'ui/library_sort.dart';
@@ -53,6 +56,8 @@ Future<void> main() async {
       debugPrint('$st');
     }
   }
+  // Səs mühərriki (SoLoud): AudioSession-dan SONRA başlamalıdır
+  await SoloudEngine.instance.init();
   runApp(const CloudioApp());
 }
 

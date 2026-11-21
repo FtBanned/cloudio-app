@@ -7,18 +7,19 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart'
     show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
-import 'package:just_audio/just_audio.dart';
+import 'package:just_audio/just_audio.dart' show ProcessingState;
 
 import 'app_theme.dart' show AppTheme;
 import 'audio_route_io.dart' if (dart.library.js_interop) 'audio_route_web.dart';
-import 'audio_url_stub.dart' if (dart.library.js_interop) 'audio_url_web.dart';
 import 'backup_stub.dart' if (dart.library.io) 'backup_io.dart';
 import 'backup_types.dart';
+import 'booster.dart';
 import 'cover_lookup.dart';
 import 'cover_tint.dart';
 import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
 import 'lyrics.dart';
 import 'persistence.dart';
+import 'soloud_player.dart';
 import 'tag_reader.dart';
 
 /// false yapılırsa söz araması asla internete çıkmaz (sadece dosyadaki/.lrc sözler).
@@ -151,8 +152,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   static final PlayerController instance = PlayerController._();
 
   /// Aktiv pleyer. Crossfade zamanı ikinci pleyerlə yer dəyişir, ona görə final deyil.
-  AudioPlayer player = AudioPlayer();
-  AudioPlayer? _spare; // crossfade üçün ikinci pleyer (lazım olanda yaradılır)
+  SoloudPlayer player = SoloudPlayer();
+  SoloudPlayer? _spare; // crossfade üçün ikinci pleyer (lazım olanda yaradılır)
   final List<Song> songs = []; // kitaplık (tüm şarkılar)
   final List<Playlist> playlists = [];
   final Random _rng = Random();
@@ -165,7 +166,6 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   bool get smartShuffle => shuffleMode == ShuffleMode.smart;
   bool loading = false;
   RepeatKind repeatKind = RepeatKind.off;
-  String? _currentBlobUrl;
 
   // ---- saxlama (səhifə yenilənəndə mahnılar, siyahılar, bəyənmələr itməsin) ----
   int _seq = 0;
@@ -187,6 +187,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         dynamicBg = st.dynamicBg;
         unawaited(player.setSpeed(speed));
       }
+      await Booster.instance.load();
       final th = await CloudioStore.instance.loadTheme();
       if (th != null) AppTheme.instance.restore(th.mode, th.accent);
       final pr = await CloudioStore.instance.loadProfile();
@@ -312,7 +313,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     yield* _posCtl.stream;
   }
 
-  void _bind(AudioPlayer p) {
+  void _bind(SoloudPlayer p) {
     for (final sub in _subs) {
       sub.cancel();
     }
@@ -702,7 +703,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   bool _fading = false;
   Timer? _fadeRamp; // səs əyrisi taymeri
   Timer? _crossTimer; // keçidin başlama anını dəqiq tutur
-  AudioPlayer? _fadeOld; // səsi azalan köhnə pleyer
+  SoloudPlayer? _fadeOld; // səsi azalan köhnə pleyer
   Song? _preSong; // ikinci pleyerdə hazır gözləyən mahnı
   bool _preloading = false;
 
@@ -864,7 +865,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (_preloading || path == null) return;
     _preloading = true;
     try {
-      final sp = _spare ??= AudioPlayer();
+      final sp = _spare ??= SoloudPlayer();
       await sp.setVolume(0);
       await sp.setSpeed(speed);
       await sp.setFilePath(path);
@@ -1675,11 +1676,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
           debugPrint('Səs faylı bazada tapılmadı: ${s.title}');
           return;
         }
-        final oldUrl = _currentBlobUrl;
-        final url = createAudioUrl(data, _mime(s.ext));
-        _currentBlobUrl = url;
-        loadedDur = await player.setUrl(url, initialPosition: startAt);
-        if (oldUrl != null) revokeAudioUrl(oldUrl);
+        loadedDur =
+            await player.setBytes(data, name: s.id, initialPosition: startAt);
       } else {
         final path = s.path;
         if (path == null) {
