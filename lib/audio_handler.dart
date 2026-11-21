@@ -70,19 +70,28 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
     _broadcast();
   }
 
-  // Çalarkən arxa planda hər 10 saniyədən bir Now Playing-i yenidən yazırıq və ses oturumunu
-  // aktiv saxlayırıq: iOS bəzən bir müddət sonra Control Center / kilid ekranı kartını silir.
+  // SoLoud (miniaudio) çıxış cihazını başladanda iOS ses oturumunun kateqoriyasını öz
+  // seçimi ilə dəyişə bilər; onda musiqi davam edir, amma iOS tətbiqi "Now Playing" tətbiqi
+  // saymır və Control Center / kilid ekranı kartı silinir. Ona görə çalarkən oturumu "music"
+  // kateqoriyasına qaytarıb aktiv edirik və mahnı məlumatını yenidən yazırıq.
   Timer? _keepAlive;
 
+  Future<void> _fixSession() async {
+    if (!_c.player.playing) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      await session.setActive(true);
+    } catch (_) {}
+    if (_c.player.playing) _reassert();
+  }
+
   void _startKeepAlive() {
-    _keepAlive ??= Timer.periodic(const Duration(seconds: 10), (_) async {
-      if (!_c.player.playing) return;
-      try {
-        final session = await AudioSession.instance;
-        await session.setActive(true);
-      } catch (_) {}
-      _reassert();
-    });
+    // çalma başlayandan az sonra (cihaz tam qalxandan sonra) iki dəfə, sonra hər 10 saniyə
+    Future<void>.delayed(const Duration(milliseconds: 1500), _fixSession);
+    Future<void>.delayed(const Duration(seconds: 5), _fixSession);
+    _keepAlive ??=
+        Timer.periodic(const Duration(seconds: 10), (_) => _fixSession());
   }
 
   void _stopKeepAlive() {
