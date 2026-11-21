@@ -1017,11 +1017,14 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
             s.tint = await coverTint(hit.bytes);
             s.coverStatus = CoverStatus.found;
             if (s.album.isEmpty) s.album = hit.album;
-            if (hit.forceInfo && hit.title.isNotEmpty) {
-              // "Yakın sonuç": elle seçimdeki gibi ad, sanatçı ve albüm de uygulanır
-              s.title = hit.title;
-              if (hit.artist.isNotEmpty) s.artist = hit.artist;
-              if (hit.album.isNotEmpty) s.album = hit.album;
+            if (hit.forceInfo) {
+              // "Yakın sonuç": kapak her durumda konur. Eşleşme güçlüyse (>= 0.5) elle
+              // seçimdeki gibi ad, sanatçı ve albüm de uygulanır; zayıfsa adlar korunur.
+              if (hit.score >= 0.5 && hit.title.isNotEmpty) {
+                s.title = hit.title;
+                if (hit.artist.isNotEmpty) s.artist = hit.artist;
+                if (hit.album.isNotEmpty) s.album = hit.album;
+              }
             } else if (hit.swapped && hit.title.isNotEmpty && hit.artist.isNotEmpty) {
               s.title = hit.title; // ad ilə sənətçi yer dəyişmişdi: düzəlt
               s.artist = hit.artist;

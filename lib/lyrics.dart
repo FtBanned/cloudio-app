@@ -150,9 +150,19 @@ Future<Lyrics?> fetchLyricsOnline({
     {'q': artist.isEmpty ? cleanTitle : '$cleanArtist $cleanTitle'},
   ];
 
+  // Ek sorgular (söz MUTLAKA aranır): ad/sanatçı sırası ters, sadece ad. Bunlarda yanlış
+  // şarkının sözü gelmesin diye sonuç ad+sanatçı sözcükleriyle eşleştirilir.
+  final extra = <Map<String, String>>[
+    if (artist.isNotEmpty) {'q': '$cleanTitle $cleanArtist'},
+    if (artist.isNotEmpty && cleanTitle.isNotEmpty) {'q': cleanTitle},
+    if (artist.isEmpty && cleanTitle.isNotEmpty) {'q': cleanTitle.split(' ').take(4).join(' ')},
+  ];
+  final qTokens = _lyTokens('$cleanArtist $cleanTitle');
+
   var anySuccess = false;
   Object? lastError;
-  for (final q in queries) {
+  for (final q in [...queries, ...extra]) {
+    final isExtra = extra.contains(q);
     try {
       final res = await http
           .get(Uri.https('lrclib.net', '/api/search', q))
@@ -164,7 +174,8 @@ Future<Lyrics?> fetchLyricsOnline({
       anySuccess = true;
       final list = jsonDecode(utf8.decode(res.bodyBytes));
       if (list is! List) continue;
-      final best = _pickBest(list, duration);
+      final best = _pickBest(
+          isExtra ? _filterByTokens(list, qTokens) : list, duration);
       if (best != null) return best;
     } catch (e) {
       lastError = e;
@@ -220,6 +231,45 @@ Future<List<LyricsCandidate>> searchLyricsCandidates(String query) async {
       lyrics: parsed,
     ));
     if (out.length >= 30) break;
+  }
+  return out;
+}
+
+String _lyNorm(String s) {
+  const tr = {
+    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+    'ə': 'e', 'Ə': 'e', 'Ç': 'c', 'Ğ': 'g', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
+    'â': 'a', 'î': 'i', 'û': 'u', 'é': 'e',
+  };
+  final b = StringBuffer();
+  for (final r in s.runes) {
+    final ch = String.fromCharCode(r);
+    b.write(tr[ch] ?? ch);
+  }
+  return b
+      .toString()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+List<String> _lyTokens(String s) =>
+    [for (final t in _lyNorm(s).split(' ')) if (t.isNotEmpty) t];
+
+/// LRCLIB sonuçlarından, adı+sanatçısı girişle sözcük bazında örtüşenleri bırakır.
+List _filterByTokens(List list, List<String> qTok) {
+  if (qTok.isEmpty) return const [];
+  final out = [];
+  for (final item in list) {
+    if (item is! Map) continue;
+    final ct = _lyTokens('${item['trackName'] ?? item['name'] ?? ''}');
+    final ca = _lyTokens('${item['artistName'] ?? ''}');
+    if (ct.isEmpty) continue;
+    final all = {...ct, ...ca};
+    final qIn = qTok.where(all.contains).length / qTok.length;
+    final cIn = ct.where(qTok.contains).length / ct.length;
+    if (qIn >= 0.5 && cIn >= 0.6) out.add(item);
   }
   return out;
 }

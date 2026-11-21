@@ -243,69 +243,93 @@ Future<CoverHit?> _fallbackCover({
   return null;
 }
 
-/// Son çare: "Şarkı bilgilerini düzenle > İnternette ara" ekranındaki aramanın aynısını
-/// ("sanatçı ad") yapar, sonuçlardan girişe EN YAKIN olanı seçer ve uygular.
-/// Çok zayıf eşleşmeler (ortak sözcük yok) yine de reddedilir; yanlış seçilirse kullanıcı
-/// düzenleme ekranından elle düzeltir.
+/// Eşiksiz benzerlik puanı (0..1). En yakın sonuç her zaman seçilebilsin diye alt sınır yok.
+double _softScore(_Cand c, List<String> qTok) {
+  final ct = _tokens(c.title);
+  if (ct.isEmpty || qTok.isEmpty) return 0;
+  final all = [...ct, ..._tokens(c.artist), ..._tokens(c.album)];
+  return 0.6 * _coverage(qTok, all) + 0.4 * _coverage(ct, qTok);
+}
+
+/// "Yakın sonuç" için sırayla denenecek sorgular (İnternette ara'daki gibi + gevşekleri).
+List<String> _bestEffortQueries(String title, String artist) {
+  final rawT = tidyName(title);
+  final rawA = artist.isEmpty ? '' : tidyName(artist);
+  final noFeat = _stripFeat(rawT);
+  final seen = <String>{};
+  final out = <String>[];
+  for (final q in [
+    '$rawA $rawT',
+    if (rawA.isNotEmpty) '$rawT $rawA',
+    cleanForSearch('$rawA $rawT'),
+    if (noFeat != rawT) '$rawA $noFeat',
+    rawT,
+    if (rawA.isNotEmpty) rawA,
+  ]) {
+    final t = q.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (t.isNotEmpty && seen.add(_norm(t))) out.add(t);
+  }
+  return out;
+}
+
+/// Son çare: kapak MUTLAKA bulunmaya çalışılır. "İnternette ara" ile aynı aramayı yapar
+/// (sonuç çıkmazsa daha gevşek sorgular dener) ve girişe en yakın sonucu EŞİKSİZ seçer.
+/// Yanlış olursa kullanıcı düzenleme ekranından elle düzeltir.
 Future<CoverHit?> _bestEffortCover({
   required String title,
   required String artist,
 }) async {
-  final rawT = tidyName(title);
   final rawA = artist.isEmpty ? '' : tidyName(artist);
-  final q = cleanForSearch('$rawA $rawT'.trim());
-  final qTok = _tokens('$rawA $rawT');
-  if (q.isEmpty || qTok.isEmpty) return null;
+  final qTok = _tokens('$rawA ${tidyName(title)}');
+  final queries = _bestEffortQueries(title, artist);
+  if (qTok.isEmpty || queries.isEmpty) return null;
 
   final all = <_Cand>[];
   final seen = <String>{};
-  for (final fetch in <Future<List<_Cand>> Function()>[
-    () => _deezer(q, limit: 15),
-    () => _itunes(q, 'tr', limit: 12),
-    () => _itunes(q, 'us', limit: 8),
-  ]) {
-    try {
-      for (final c in await fetch()) {
-        if (c.arts.isEmpty) continue;
-        if (seen.add(_norm('${c.artist} ${c.title} ${c.album}'))) all.add(c);
+  var bestSoFar = 0.0;
+  for (var qi = 0; qi < queries.length; qi++) {
+    final q = queries[qi];
+    final fetches = <Future<List<_Cand>> Function()>[
+      () => _deezer(q, limit: 15),
+      if (qi < 2) () => _itunes(q, 'tr', limit: 12),
+      if (qi == 0) () => _itunes(q, 'us', limit: 8),
+    ];
+    for (final fetch in fetches) {
+      try {
+        for (final c in await fetch()) {
+          if (c.arts.isEmpty) continue;
+          if (seen.add(_norm('${c.artist} ${c.title} ${c.album}'))) all.add(c);
+        }
+      } catch (e) {
+        debugPrint('[Kapak] yakın sonuç "$q" HATA: $e');
       }
-    } catch (e) {
-      debugPrint('[Kapak] yakın sonuç "$q" HATA: $e');
     }
+    for (final c in all) {
+      bestSoFar = max(bestSoFar, _softScore(c, qTok));
+    }
+    if (bestSoFar >= 0.8) break; // yeterince iyi bir aday var
   }
 
-  // Eşit puanda sıradaki (kaynağın kendi alaka sırası) öne geçsin
-  final scored = <(double, _Cand)>[];
+  // Eşit puanda önce gelen (kaynağın kendi alaka sırası) kazansın
+  final scored = <(double, double, _Cand)>[];
   for (var i = 0; i < all.length; i++) {
-    final sc = _bestEffortScore(all[i], qTok);
-    if (sc > 0) scored.add((sc - i * 0.002, all[i]));
+    final sc = _softScore(all[i], qTok);
+    scored.add((sc - i * 0.002, sc, all[i]));
   }
   scored.sort((x, y) => y.$1.compareTo(x.$1));
-  debugPrint('[Kapak] yakın sonuç "$q": ${all.length} sonuç, ${scored.length} uygun');
-  for (final (score, c) in scored.take(5)) {
+  debugPrint('[Kapak] yakın sonuç "${queries.first}": ${all.length} aday');
+  for (final (_, sc, c) in scored.take(10)) {
     for (final url in c.arts) {
       final img = await _getImage(url);
       if (img != null) {
         debugPrint(
-            '[Kapak] yakın sonuç "$q": SEÇİLDİ (${score.toStringAsFixed(2)}, ${c.artist} - ${c.title})');
+            '[Kapak] yakın sonuç: SEÇİLDİ (${sc.toStringAsFixed(2)}, ${c.artist} - ${c.title})');
         return CoverHit(img, c.title, c.artist, c.album, 'yakin-sonuc',
-            score: score, forceInfo: true);
+            score: sc, forceInfo: true);
       }
     }
   }
   return null;
-}
-
-/// 0 = uygun değil. Girişteki sözcüklerin adayda (başlık+sanatçı+albüm) bulunması ve
-/// adayın başlığının girişte bulunması gerekir (sıra ve ad/sanatçı yeri fark etmez).
-double _bestEffortScore(_Cand c, List<String> qTok) {
-  final ct = _tokens(c.title);
-  if (ct.isEmpty || qTok.isEmpty) return 0;
-  final all = [...ct, ..._tokens(c.artist), ..._tokens(c.album)];
-  final qIn = _coverage(qTok, all); // giriş adayda var mı
-  final cIn = _coverage(ct, qTok); // adayın başlığı girişte var mı
-  if (cIn < 0.5 || qIn < 0.5) return 0;
-  return 0.6 * qIn + 0.4 * cIn;
 }
 
 /// Yumşaq uyğunluq: adayın başlığı girişdə (ad+sənətçi sözləri birlikdə) olmalı, giriş
@@ -513,33 +537,47 @@ Future<MetaHit?> findMeta({
       }
     }
   }
-  // Sərt yoxlama hamısını tapmadısa: "yakın sonuç" son çaresi (eksik alanları doldurur)
+  // Sərt yoxlama hamısını tapmadısa: "yakın sonuç" son çaresi. Eşik YOK; girişe en yakın
+  // adaylardan eksik alanlar (janr / yıl / albümdeki sıra) tamamlanana kadar doldurulur.
   if (!done() && reached > 0) {
     try {
-      final rawT = tidyName(title);
       final rawA = artist.isEmpty ? '' : tidyName(artist);
-      final q = cleanForSearch('$rawA $rawT'.trim());
-      final qTok = _tokens('$rawA $rawT');
-      if (q.isNotEmpty && qTok.isNotEmpty) {
+      final qTok = _tokens('$rawA ${tidyName(title)}');
+      final bq = _bestEffortQueries(title, artist);
+      if (qTok.isNotEmpty && bq.isNotEmpty) {
         final all = <_MetaCand>[];
-        for (final search in <Future<List<_MetaCand>> Function()>[
-          () => _deezerMeta(q),
-          () => _itunesMeta(q, 'tr'),
-          () => _itunesMeta(q, 'us'),
-        ]) {
-          try {
-            all.addAll(await search());
-          } catch (e) {
-            debugPrint('[Bilgi] yakın sonuç "$q" HATA: $e');
+        final seenM = <String>{};
+        var bestSoFar = 0.0;
+        for (var qi = 0; qi < bq.length; qi++) {
+          final q = bq[qi];
+          final searches = <Future<List<_MetaCand>> Function()>[
+            () => _deezerMeta(q),
+            if (qi < 2) () => _itunesMeta(q, 'tr'),
+            if (qi == 0) () => _itunesMeta(q, 'us'),
+            if (qi == 1) () => _itunesMeta(q, 'az'),
+          ];
+          for (final search in searches) {
+            try {
+              for (final m in await search()) {
+                if (seenM.add(_norm('${m.base.artist} ${m.base.title} ${m.base.album}'))) {
+                  all.add(m);
+                }
+              }
+            } catch (e) {
+              debugPrint('[Bilgi] yakın sonuç "$q" HATA: $e');
+            }
           }
+          for (final m in all) {
+            bestSoFar = max(bestSoFar, _softScore(m.base, qTok));
+          }
+          if (bestSoFar >= 0.8) break;
         }
         final scored = <(double, _MetaCand)>[];
         for (var i = 0; i < all.length; i++) {
-          final sc = _bestEffortScore(all[i].base, qTok);
-          if (sc > 0) scored.add((sc - i * 0.002, all[i]));
+          scored.add((_softScore(all[i].base, qTok) - i * 0.002, all[i]));
         }
         scored.sort((x, y) => y.$1.compareTo(x.$1));
-        for (final (_, m) in scored.take(2)) {
+        for (final (_, m) in scored.take(6)) {
           if (done()) break;
           await m.resolve();
           var got = false;
@@ -556,7 +594,7 @@ Future<MetaHit?> findMeta({
             discNo = m.discNo;
             got = true;
           }
-          debugPrint('[Bilgi] yakın sonuç "$q": ${got ? 'BULUNDU' : 'alan yok'}');
+          debugPrint('[Bilgi] yakın sonuç "${m.base.artist} - ${m.base.title}": ${got ? 'BULUNDU' : 'alan yok'}');
           if (got) src = src.isEmpty ? 'yakin-sonuc' : '$src+yakin-sonuc';
         }
       }
