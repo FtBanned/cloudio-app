@@ -35,10 +35,12 @@ class AudioRouteWatcher {
     try {
       final session = await AudioSession.instance;
       _subs.add(session.becomingNoisyEventStream.listen((_) => onRemoved()));
-      _subs.add(session.devicesChangedEventStream.listen((e) {
-        if (e.devicesRemoved.any(_isExternalOutput)) onRemoved();
-        if (e.devicesAdded.any(_isExternalOutput)) onAdded();
-      }));
+      _subs.add(
+        session.devicesChangedEventStream.listen((e) {
+          if (e.devicesRemoved.any(_isExternalOutput)) onRemoved();
+          if (e.devicesAdded.any(_isExternalOutput)) onAdded();
+        }),
+      );
     } catch (e) {
       debugPrint('[Cloudio] Qulaqlıq izləmə başlamadı: $e');
     }

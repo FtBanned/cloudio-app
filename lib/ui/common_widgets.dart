@@ -45,21 +45,24 @@ class SongTile extends StatelessWidget {
       selectedColor: kGreen,
       leading: Cover(size: 48, bytes: song.cover),
       title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(song.artist,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: kText60)),
+      subtitle: Text(
+        song.artist,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: kText60),
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (song.duration != null)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: Text(formatDuration(song.duration!),
-                  style: TextStyle(color: kText54, fontSize: 13)),
+              child: Text(
+                formatDuration(song.duration!),
+                style: TextStyle(color: kText54, fontSize: 13),
+              ),
             ),
-          if (song.liked)
-            Icon(Icons.check_circle, color: kGreen, size: 20),
+          if (song.liked) Icon(Icons.check_circle, color: kGreen, size: 20),
           IconButton(
             icon: const Icon(Icons.more_horiz),
             onPressed: () => showSongMenu(context, song, playlist: playlist),
@@ -88,8 +91,7 @@ class FilterPill extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback? onTap;
-  const FilterPill(this.label,
-      {super.key, this.selected = false, this.onTap});
+  const FilterPill(this.label, {super.key, this.selected = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -105,10 +107,7 @@ class FilterPill extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: selected ? Colors.black : kText,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: selected ? Colors.black : kText, fontWeight: FontWeight.w600),
         ),
       ),
     );

@@ -2,15 +2,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 import 'backup_types.dart' show formatBytes;
-import 'main.dart'
-    show Cover, formatDuration, kBg, kCard, kGreen, kText38, kText54, kText60;
+import 'main.dart' show Cover, formatDuration, kBg, kCard, kGreen, kText38, kText54, kText60;
 import 'player_controller.dart';
 
 /// Tekrar eden şarkılar səhifəsini açır (Ayarlar → Kitaplık).
 void openDuplicates(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const DuplicatesPage()),
-  );
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DuplicatesPage()));
 }
 
 // ---------------------------------------------------------------- aşkarlama
@@ -20,9 +17,7 @@ void openDuplicates(BuildContext context) {
 String _normText(String input) {
   var t = input.toLowerCase();
   t = t.replaceAll(RegExp(r'\p{M}', unicode: true), ''); // birləşən işarələr (İ -> i̇)
-  const fold = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'ə': 'e',
-  };
+  const fold = {'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'ə': 'e'};
   fold.forEach((k, v) => t = t.replaceAll(k, v));
   t = t.replaceAll(RegExp(r'\s*[\(\[]\s*\d+\s*[\)\]]\s*$'), ''); // "... (1)"
   t = t.replaceAll(RegExp(r'[\s\-_]*(copy|kopya|kopyasi)\s*\d*\s*$'), '');
@@ -158,8 +153,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: kCard,
-        icon: const Icon(Icons.warning_amber_rounded,
-            color: Colors.redAccent, size: 36),
+        icon: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 36),
         title: Text(title),
         content: Text(body, style: const TextStyle(height: 1.4)),
         actions: [
@@ -181,15 +175,15 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
     final keep = _keepOf(gi);
     final removes = [
       for (final s in _groups[gi].songs)
-        if (!identical(s, keep)) s
+        if (!identical(s, keep)) s,
     ];
     final ok = await _confirm(
       'Kopyalar silinsin mi?',
       '"${keep.title}" kalacak (${keep.ext.toUpperCase()}).\n'
-      '${removes.length} kopya silinecek: '
-      '${removes.map((s) => s.ext.toUpperCase()).join(', ')}.\n\n'
-      'Çalma listeleri, beğeni ve dinleme sayısı kalan şarkıya aktarılır. '
-      'Silinen kopyanın ses dosyası da silinir. Bu geri alınamaz.',
+          '${removes.length} kopya silinecek: '
+          '${removes.map((s) => s.ext.toUpperCase()).join(', ')}.\n\n'
+          'Çalma listeleri, beğeni ve dinleme sayısı kalan şarkıya aktarılır. '
+          'Silinen kopyanın ses dosyası da silinir. Bu geri alınamaz.',
     );
     if (!ok || !mounted) return;
     setState(() => _busy = true);
@@ -215,7 +209,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
       final keep = _keepOf(gi);
       final removes = [
         for (final s in _groups[gi].songs)
-          if (!identical(s, keep)) s
+          if (!identical(s, keep)) s,
       ];
       plan[keep] = removes;
       total += removes.length;
@@ -223,9 +217,9 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
     final ok = await _confirm(
       'Hepsi temizlensin mi?',
       '${_groups.length} grupta toplam $total kopya silinecek. Her grupta '
-      'seçili olan şarkı kalır (önerilen ya da senin seçtiğin).\n\n'
-      'Çalma listeleri, beğeni ve dinleme sayısı kalan şarkıya aktarılır. '
-      'Ses dosyaları da silinir. Bu geri alınamaz.',
+          'seçili olan şarkı kalır (önerilen ya da senin seçtiğin).\n\n'
+          'Çalma listeleri, beğeni ve dinleme sayısı kalan şarkıya aktarılır. '
+          'Ses dosyaları da silinir. Bu geri alınamaz.',
     );
     if (!ok || !mounted) return;
     setState(() => _busy = true);
@@ -261,14 +255,12 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text('Tekrar eden şarkılar',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Tekrar eden şarkılar', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           if (_groups.isNotEmpty)
             TextButton(
               onPressed: _busy ? null : _mergeAll,
-              child: const Text('Hepsini temizle',
-                  style: TextStyle(color: Colors.redAccent)),
+              child: const Text('Hepsini temizle', style: TextStyle(color: Colors.redAccent)),
             ),
         ],
       ),
@@ -276,14 +268,15 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(32),
-                child: Text('Tekrar eden şarkı bulunamadı.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: kText60)),
+                child: Text(
+                  'Tekrar eden şarkı bulunamadı.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: kText60),
+                ),
               ),
             )
           : ListView(
-              padding: EdgeInsets.fromLTRB(
-                  16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
               children: [
                 Text(
                   '${_groups.length} grup bulundu. Eşleşme şarkı adı, sanatçı ve süreye '
@@ -305,10 +298,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-      decoration: BoxDecoration(
-        color: kCard,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: [
           for (final s in g.songs)
@@ -320,10 +310,11 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                 child: Row(
                   children: [
                     Icon(
-                        identical(s, keep)
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        color: identical(s, keep) ? kGreen : kText38),
+                      identical(s, keep)
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: identical(s, keep) ? kGreen : kText38,
+                    ),
                     const SizedBox(width: 10),
                     Cover(size: 44, bytes: s.cover),
                     const SizedBox(width: 12),
@@ -331,23 +322,28 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
-                          Text(s.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: kText60, fontSize: 12)),
-                          Text(_details(s),
-                              style: TextStyle(color: kText54, fontSize: 11)),
+                          Text(
+                            s.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            s.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: kText60, fontSize: 12),
+                          ),
+                          Text(_details(s), style: TextStyle(color: kText54, fontSize: 11)),
                           if (identical(s, g.best))
-                            Text('Önerilen',
-                                style: TextStyle(
-                                    color: kGreen,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold)),
+                            Text(
+                              'Önerilen',
+                              style: TextStyle(
+                                color: kGreen,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -359,10 +355,11 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: _busy ? null : () => _mergeGroup(gi),
-              icon: const Icon(Icons.delete_outline,
-                  size: 18, color: Colors.redAccent),
-              label: const Text('Seçilen dışındakileri sil',
-                  style: TextStyle(color: Colors.redAccent)),
+              icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+              label: const Text(
+                'Seçilen dışındakileri sil',
+                style: TextStyle(color: Colors.redAccent),
+              ),
             ),
           ),
         ],

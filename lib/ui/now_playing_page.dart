@@ -6,8 +6,7 @@ class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      const DarkZone(child: _MiniPlayerBody());
+  Widget build(BuildContext context) => const DarkZone(child: _MiniPlayerBody());
 }
 
 class _MiniPlayerBody extends StatelessWidget {
@@ -18,8 +17,10 @@ class _MiniPlayerBody extends StatelessWidget {
       PageRouteBuilder(
         pageBuilder: (_, _, _) => const DarkZone(child: NowPlayingPage()),
         transitionsBuilder: (_, anim, _, child) => SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-              .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
           child: child,
         ),
       ),
@@ -44,65 +45,64 @@ class _MiniPlayerBody extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                 child: AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            decoration: BoxDecoration(
-              color: shadeTint(song.tint, const Color(0xFF1B3A28))
-                  .withAlpha(215),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Cover(size: 44, bytes: song.cover),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  duration: const Duration(milliseconds: 400),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                  decoration: BoxDecoration(
+                    color: shadeTint(song.tint, const Color(0xFF1B3A28)).withAlpha(215),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
                         children: [
-                          Text(song.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(song.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 12)),
+                          Cover(size: 44, bytes: song.cover),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  song.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  song.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow, size: 30),
+                            onPressed: c.togglePlay,
+                          ),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow,
-                          size: 30),
-                      onPressed: c.togglePlay,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                StreamBuilder<Duration>(
-                  stream: c.positionStream,
-                  builder: (context, snap) {
-                    final dur = c.player.duration?.inMilliseconds ?? 0;
-                    final pos = snap.data?.inMilliseconds ?? 0;
-                    final v =
-                        dur <= 0 ? 0.0 : (pos / dur).clamp(0.0, 1.0).toDouble();
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: LinearProgressIndicator(
-                        value: v,
-                        minHeight: 2,
-                        backgroundColor: Colors.white24,
-                        color: Colors.white,
+                      const SizedBox(height: 4),
+                      StreamBuilder<Duration>(
+                        stream: c.positionStream,
+                        builder: (context, snap) {
+                          final dur = c.player.duration?.inMilliseconds ?? 0;
+                          final pos = snap.data?.inMilliseconds ?? 0;
+                          final v = dur <= 0 ? 0.0 : (pos / dur).clamp(0.0, 1.0).toDouble();
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: v,
+                              minHeight: 2,
+                              backgroundColor: Colors.white24,
+                              color: Colors.white,
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 4),
-              ],
-            ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -137,8 +137,7 @@ class NowPlayingPage extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, box) {
                   // İlk ekran oynatıcı; altta söz kartının üst kısmı görünür kalır (Spotify gibi)
-                  final firstH =
-                      box.maxHeight - 72 < 520 ? 520.0 : box.maxHeight - 72;
+                  final firstH = box.maxHeight - 72 < 520 ? 520.0 : box.maxHeight - 72;
                   return SingleChildScrollView(
                     child: Column(
                       children: [
@@ -147,178 +146,178 @@ class NowPlayingPage extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 32),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        const Expanded(
-                          child: Text(
-                            'Çalıyor',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.more_horiz),
-                          onPressed: () => showSongMenu(context, song),
-                        ),
-                      ],
-                    ),
-                    Expanded(
-                      child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (song.tint ?? Colors.black)
-                                    .withValues(alpha: 0.55),
-                                blurRadius: 40,
-                                spreadRadius: -4,
-                                offset: const Offset(0, 18),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: song.cover == null
-                              ? Container(
-                                  color: Colors.grey.shade800,
-                                  child:
-                                      const Icon(Icons.music_note, size: 96),
-                                )
-                              : Image.memory(
-                                  song.cover!,
-                                  fit: BoxFit.cover,
-                                  cacheWidth: 900,
-                                  gaplessPlayback: true,
+                              children: [
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.keyboard_arrow_down, size: 32),
+                                      onPressed: () => Navigator.pop(context),
+                                    ),
+                                    const Expanded(
+                                      child: Text(
+                                        'Çalıyor',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.more_horiz),
+                                      onPressed: () => showSongMenu(context, song),
+                                    ),
+                                  ],
                                 ),
-                        ),
-                        ),
-                      ),
-                    ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (song.lyrics != null && song.lyrics!.synced)
-                      _CoverLyricLine(
-                        key: ValueKey(song.lyrics),
-                        lyrics: song.lyrics!,
-                      ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                song.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 24, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                song.album.isEmpty
-                                    ? song.artist
-                                    : '${song.artist} • ${song.album}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 16, color: Colors.white60),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          iconSize: 30,
-                          tooltip: song.liked ? 'Beğenmekten vazgeç' : 'Beğen',
-                          icon: Icon(
-                            song.liked
-                                ? Icons.check_circle
-                                : Icons.add_circle_outline,
-                            color: song.liked ? kGreen : Colors.white70,
-                          ),
-                          onPressed: () => c.toggleLike(song),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const SeekBar(),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: Icon(shuffleIconFor(c),
-                              color: c.shuffleOn ? kGreen : Colors.white),
-                          onPressed: () => showShuffleSheet(context),
-                        ),
-                        IconButton(
-                          iconSize: 40,
-                          icon: const Icon(Icons.skip_previous),
-                          onPressed: c.previous,
-                        ),
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            iconSize: 40,
-                            color: Colors.black,
-                            icon: Icon(
-                                c.isPlaying ? Icons.pause : Icons.play_arrow),
-                            onPressed: c.togglePlay,
-                          ),
-                        ),
-                        IconButton(
-                          iconSize: 40,
-                          icon: const Icon(Icons.skip_next),
-                          onPressed: c.hasNext ? c.next : null,
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            c.repeatKind == RepeatKind.one
-                                ? Icons.repeat_one
-                                : Icons.repeat,
-                            color: c.repeatKind == RepeatKind.off
-                                ? Colors.white
-                                : kGreen,
-                          ),
-                          onPressed: c.cycleRepeat,
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const _SleepTimerButton(),
-                        const _BoosterButton(),
-                        IconButton(
-                          tooltip: 'Çalma ayarları',
-                          icon: const Icon(Icons.tune),
-                          onPressed: () => openSettings(context),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          tooltip: 'Sıra',
-                          icon: const Icon(Icons.queue_music),
-                          onPressed: () => openQueue(context),
-                        ),
-                      ],
-                    ),
-                  ],
+                                Expanded(
+                                  child: Center(
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 420),
+                                      child: AspectRatio(
+                                        aspectRatio: 1,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: (song.tint ?? Colors.black).withValues(
+                                                  alpha: 0.55,
+                                                ),
+                                                blurRadius: 40,
+                                                spreadRadius: -4,
+                                                offset: const Offset(0, 18),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: song.cover == null
+                                                ? Container(
+                                                    color: Colors.grey.shade800,
+                                                    child: const Icon(Icons.music_note, size: 96),
+                                                  )
+                                                : Image.memory(
+                                                    song.cover!,
+                                                    fit: BoxFit.cover,
+                                                    cacheWidth: 900,
+                                                    gaplessPlayback: true,
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                if (song.lyrics != null && song.lyrics!.synced)
+                                  _CoverLyricLine(key: ValueKey(song.lyrics), lyrics: song.lyrics!),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            song.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            song.album.isEmpty
+                                                ? song.artist
+                                                : '${song.artist} • ${song.album}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white60,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      iconSize: 30,
+                                      tooltip: song.liked ? 'Beğenmekten vazgeç' : 'Beğen',
+                                      icon: Icon(
+                                        song.liked ? Icons.check_circle : Icons.add_circle_outline,
+                                        color: song.liked ? kGreen : Colors.white70,
+                                      ),
+                                      onPressed: () => c.toggleLike(song),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const SeekBar(),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        shuffleIconFor(c),
+                                        color: c.shuffleOn ? kGreen : Colors.white,
+                                      ),
+                                      onPressed: () => showShuffleSheet(context),
+                                    ),
+                                    IconButton(
+                                      iconSize: 40,
+                                      icon: const Icon(Icons.skip_previous),
+                                      onPressed: c.previous,
+                                    ),
+                                    Container(
+                                      width: 72,
+                                      height: 72,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: IconButton(
+                                        iconSize: 40,
+                                        color: Colors.black,
+                                        icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow),
+                                        onPressed: c.togglePlay,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      iconSize: 40,
+                                      icon: const Icon(Icons.skip_next),
+                                      onPressed: c.hasNext ? c.next : null,
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        c.repeatKind == RepeatKind.one
+                                            ? Icons.repeat_one
+                                            : Icons.repeat,
+                                        color: c.repeatKind == RepeatKind.off
+                                            ? Colors.white
+                                            : kGreen,
+                                      ),
+                                      onPressed: c.cycleRepeat,
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    const _SleepTimerButton(),
+                                    const _BoosterButton(),
+                                    IconButton(
+                                      tooltip: 'Çalma ayarları',
+                                      icon: const Icon(Icons.tune),
+                                      onPressed: () => openSettings(context),
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      tooltip: 'Sıra',
+                                      icon: const Icon(Icons.queue_music),
+                                      onPressed: () => openQueue(context),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -358,41 +357,39 @@ class _SleepTimerButton extends StatelessWidget {
           );
         }
         Widget btn(String text) => TextButton.icon(
-              onPressed: () => showSleepSheet(context),
-              icon: Icon(Icons.bedtime, color: kGreen),
-              label: Text(text,
-                  style: TextStyle(
-                      color: kGreen, fontWeight: FontWeight.bold)),
-            );
+          onPressed: () => showSleepSheet(context),
+          icon: Icon(Icons.bedtime, color: kGreen),
+          label: Text(
+            text,
+            style: TextStyle(color: kGreen, fontWeight: FontWeight.bold),
+          ),
+        );
         final ends = c.sleepEndsAt;
         if (ends == null) return btn('Şarkı bitince');
         // Qalan vaxt hər saniyə yenilənir
         return StreamBuilder<int>(
           stream: Stream.periodic(const Duration(seconds: 1), (i) => i),
-          builder: (context, _) =>
-              btn(formatDuration(ends.difference(DateTime.now()))),
+          builder: (context, _) => btn(formatDuration(ends.difference(DateTime.now()))),
         );
       },
     );
   }
 }
 
-IconData shuffleIconFor(PlayerController c) =>
-    c.smartShuffle ? Icons.auto_awesome : Icons.shuffle;
+IconData shuffleIconFor(PlayerController c) => c.smartShuffle ? Icons.auto_awesome : Icons.shuffle;
 
 /// Qarışıq çalma seçimi: Qarışıq / Ağıllı mix (seçilmiş olana yenidən toxunmaq söndürür).
 void showShuffleSheet(BuildContext context) {
   final c = PlayerController.instance;
-  Widget option(BuildContext ctx, ShuffleMode m, IconData icon, String title,
-      String sub) {
+  Widget option(BuildContext ctx, ShuffleMode m, IconData icon, String title, String sub) {
     final on = c.shuffleMode == m;
     return ListTile(
       leading: Icon(icon, color: on ? kGreen : kText70),
-      title: Text(title,
-          style: TextStyle(
-              color: on ? kGreen : kText, fontWeight: FontWeight.w600)),
-      subtitle: Text(sub,
-          style: TextStyle(color: kText54, fontSize: 12)),
+      title: Text(
+        title,
+        style: TextStyle(color: on ? kGreen : kText, fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(sub, style: TextStyle(color: kText54, fontSize: 12)),
       trailing: on ? Icon(Icons.check, color: kGreen) : null,
       onTap: () {
         Navigator.pop(ctx);
@@ -413,15 +410,27 @@ void showShuffleSheet(BuildContext context) {
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Karışık çalma',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Karışık çalma',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
-          option(ctx, ShuffleMode.normal, Icons.shuffle, 'Karışık',
-              'Liste tamamen rastgele sırayla çalınır.'),
-          option(ctx, ShuffleMode.smart, Icons.auto_awesome, 'Akıllı mix',
-              'Çok dinlediklerin ve uzun zamandır çalmadıkların öne çıkar, '
-                  'bugün çalınanlar geri düşer, aynı sanatçı üst üste gelmez.'),
+          option(
+            ctx,
+            ShuffleMode.normal,
+            Icons.shuffle,
+            'Karışık',
+            'Liste tamamen rastgele sırayla çalınır.',
+          ),
+          option(
+            ctx,
+            ShuffleMode.smart,
+            Icons.auto_awesome,
+            'Akıllı mix',
+            'Çok dinlediklerin ve uzun zamandır çalmadıkların öne çıkar, '
+                'bugün çalınanlar geri düşer, aynı sanatçı üst üste gelmez.',
+          ),
           if (c.shuffleOn)
             ListTile(
               leading: Icon(Icons.close, color: kText70),
@@ -455,15 +464,16 @@ void showSleepSheet(BuildContext context) {
     isScrollControlled: true,
     builder: (ctx) => SafeArea(
       child: ConstrainedBox(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
         child: ListView(
           shrinkWrap: true,
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Uyku zamanlayıcısı',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Uyku zamanlayıcısı',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
             for (final o in options)
               ListTile(
@@ -483,8 +493,7 @@ void showSleepSheet(BuildContext context) {
             if (c.sleepActive)
               ListTile(
                 leading: Icon(Icons.close, color: kGreen),
-                title: Text('Zamanlayıcıyı kapat',
-                    style: TextStyle(color: kGreen)),
+                title: Text('Zamanlayıcıyı kapat', style: TextStyle(color: kGreen)),
                 onTap: () {
                   Navigator.pop(ctx);
                   c.cancelSleepTimer();
@@ -553,10 +562,7 @@ class _CoverLyricLineState extends State<_CoverLyricLine> {
           transitionBuilder: (child, anim) => FadeTransition(
             opacity: anim,
             child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.5),
-                end: Offset.zero,
-              ).animate(anim),
+              position: Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(anim),
               child: child,
             ),
           ),
@@ -567,10 +573,7 @@ class _CoverLyricLineState extends State<_CoverLyricLine> {
               text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
           ),
         ),
@@ -601,8 +604,8 @@ class _SeekBarState extends State<SeekBar> {
         final dur = c.player.duration ?? Duration.zero;
         final maxMs = dur.inMilliseconds;
         final upper = maxMs <= 0 ? 0 : maxMs;
-        final posMs = _dragMs?.round() ??
-            (snap.data ?? Duration.zero).inMilliseconds.clamp(0, upper);
+        final posMs =
+            _dragMs?.round() ?? (snap.data ?? Duration.zero).inMilliseconds.clamp(0, upper);
         final pos = Duration(milliseconds: posMs);
 
         return Column(
@@ -610,8 +613,7 @@ class _SeekBarState extends State<SeekBar> {
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 3,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 6),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                 overlayShape: SliderComponentShape.noOverlay,
                 activeTrackColor: Colors.white,
                 inactiveTrackColor: Colors.white24,
@@ -634,12 +636,14 @@ class _SeekBarState extends State<SeekBar> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(formatDuration(pos),
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.white60)),
-                  Text('-${formatDuration(dur - pos)}',
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.white60)),
+                  Text(
+                    formatDuration(pos),
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
+                  Text(
+                    '-${formatDuration(dur - pos)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
                 ],
               ),
             ),
@@ -649,7 +653,6 @@ class _SeekBarState extends State<SeekBar> {
     );
   }
 }
-
 
 /// Səs gücləndirici: şarkı ekranında sürətli aç (1x..10x, aydınlıq).
 class _BoosterButton extends StatelessWidget {

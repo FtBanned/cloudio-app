@@ -13,12 +13,13 @@ void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
         children: [
           ListTile(
             leading: Cover(size: 48, bytes: song.cover),
-            title: Text(song.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(song.artist,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(
+              song.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
           const Divider(height: 1),
           ListTile(
@@ -26,9 +27,7 @@ void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
               song.liked ? Icons.check_circle : Icons.add_circle_outline,
               color: song.liked ? kGreen : null,
             ),
-            title: Text(song.liked
-                ? 'Beğenilenlerden kaldır'
-                : 'Beğenilenlere ekle'),
+            title: Text(song.liked ? 'Beğenilenlerden kaldır' : 'Beğenilenlere ekle'),
             onTap: () {
               Navigator.pop(ctx);
               c.toggleLike(song);
@@ -52,9 +51,11 @@ void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
           ),
           ListTile(
             leading: const Icon(Icons.lyrics_outlined),
-            title: Text(song.lyrics == null
-                ? 'Şarkı sözü ekle (.lrc / .txt)'
-                : 'Şarkı sözünü değiştir (.lrc / .txt)'),
+            title: Text(
+              song.lyrics == null
+                  ? 'Şarkı sözü ekle (.lrc / .txt)'
+                  : 'Şarkı sözünü değiştir (.lrc / .txt)',
+            ),
             onTap: () {
               Navigator.pop(ctx);
               pickLyricsFor(context, song);
@@ -102,27 +103,27 @@ void showPickPlaylistSheet(BuildContext context, Song song) {
     isScrollControlled: true,
     builder: (ctx) => SafeArea(
       child: ConstrainedBox(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
         child: ListView(
           shrinkWrap: true,
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Çalma listesine ekle',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Çalma listesine ekle',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
             ListTile(
-              leading: CircleAvatar(
-                backgroundColor: kText12,
-                child: Icon(Icons.add),
-              ),
+              leading: CircleAvatar(backgroundColor: kText12, child: Icon(Icons.add)),
               title: const Text('Yeni çalma listesi'),
               onTap: () async {
                 Navigator.pop(ctx);
-                final name = await askText(context,
-                    title: 'Çalma listesine ad ver',
-                    initial: 'Çalma listem #${c.playlists.length + 1}');
+                final name = await askText(
+                  context,
+                  title: 'Çalma listesine ad ver',
+                  initial: 'Çalma listem #${c.playlists.length + 1}',
+                );
                 if (name == null) return;
                 final p = c.createPlaylist(name);
                 c.addToPlaylist(p, [song]);
@@ -132,15 +133,14 @@ void showPickPlaylistSheet(BuildContext context, Song song) {
               ListTile(
                 leading: MosaicCover(songs: p.songs, size: 44),
                 title: Text(p.name),
-                subtitle: Text(p.songs.contains(song)
-                    ? 'Zaten listede'
-                    : '${p.songs.length} şarkı'),
+                subtitle: Text(
+                  p.songs.contains(song) ? 'Zaten listede' : '${p.songs.length} şarkı',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   c.addToPlaylist(p, [song]);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('"${p.name}" listesine eklendi')),
-                  );
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('"${p.name}" listesine eklendi')));
                 },
               ),
           ],
@@ -167,8 +167,7 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setSt) => SafeArea(
         child: ConstrainedBox(
-          constraints:
-              BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -177,9 +176,10 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                 child: Row(
                   children: [
                     const Expanded(
-                      child: Text('Şarkı ekle',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Şarkı ekle',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ),
                     if (candidates.isNotEmpty)
                       TextButton(
@@ -191,11 +191,8 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                           }
                         }),
                         child: Text(
-                          picked.length == candidates.length
-                              ? 'Seçimi kaldır'
-                              : 'Tümünü seç',
-                          style: TextStyle(
-                              color: kText, fontWeight: FontWeight.bold),
+                          picked.length == candidates.length ? 'Seçimi kaldır' : 'Tümünü seç',
+                          style: TextStyle(color: kText, fontWeight: FontWeight.bold),
                         ),
                       ),
                     TextButton(
@@ -205,10 +202,13 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                               c.addToPlaylist(p, picked);
                               Navigator.pop(ctx);
                             },
-                      child: Text('Ekle (${picked.length})',
-                          style: TextStyle(
-                              color: picked.isEmpty ? kText30 : kGreen,
-                              fontWeight: FontWeight.bold)),
+                      child: Text(
+                        'Ekle (${picked.length})',
+                        style: TextStyle(
+                          color: picked.isEmpty ? kText30 : kGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -232,10 +232,8 @@ void showAddSongsSheet(BuildContext context, Playlist p) {
                           activeColor: kGreen,
                           checkColor: Colors.black,
                           secondary: Cover(size: 44, bytes: s.cover),
-                          title: Text(s.title,
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(s.artist,
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
                           value: picked.contains(s),
                           onChanged: (v) => setSt(() {
                             if (v == true) {
@@ -272,8 +270,7 @@ void showPlaylistMenu(BuildContext context, Playlist p) {
             title: const Text('Ad ve ayrıntıları düzenle'),
             onTap: () async {
               Navigator.pop(ctx);
-              final name =
-                  await askText(context, title: 'Yeni ad', initial: p.name);
+              final name = await askText(context, title: 'Yeni ad', initial: p.name);
               if (name != null) c.renamePlaylist(p, name);
             },
           ),

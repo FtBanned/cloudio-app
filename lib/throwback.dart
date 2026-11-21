@@ -12,8 +12,18 @@ import 'player_controller.dart';
 const int kThrowbackTestDays = -1;
 
 const _months = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  'Ocak',
+  'Şubat',
+  'Mart',
+  'Nisan',
+  'Mayıs',
+  'Haziran',
+  'Temmuz',
+  'Ağustos',
+  'Eylül',
+  'Ekim',
+  'Kasım',
+  'Aralık',
 ];
 
 class _Item {
@@ -47,12 +57,13 @@ _Result? _compute(PlayerController c) {
       : DateTime(now.year - 1, now.month, now.day);
 
   var exact = true;
-  List<PlayEvent> events =
-      c.playsBetween(day, DateTime(day.year, day.month, day.day + 1));
+  List<PlayEvent> events = c.playsBetween(day, DateTime(day.year, day.month, day.day + 1));
   if (events.isEmpty) {
     exact = false;
-    events = c.playsBetween(DateTime(day.year, day.month, day.day - 3),
-        DateTime(day.year, day.month, day.day + 4));
+    events = c.playsBetween(
+      DateTime(day.year, day.month, day.day - 3),
+      DateTime(day.year, day.month, day.day + 4),
+    );
   }
   if (events.isEmpty) return null;
 
@@ -125,21 +136,22 @@ class _ThrowbackCardState extends State<ThrowbackCard> {
                     Icon(Icons.history, color: kGreen, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(title,
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        title,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    Text(dateTxt,
-                        style: TextStyle(color: kText54, fontSize: 12)),
+                    Text(dateTxt, style: TextStyle(color: kText54, fontSize: 12)),
                   ],
                 ),
                 const SizedBox(height: 8),
                 for (final it in r.top) _row(c, it),
                 const SizedBox(height: 6),
                 Text(
-                    '${r.exact ? 'O gün' : 'O günlerde'} ${r.plays} dinleme • '
-                    '${r.uniqueSongs} farklı şarkı',
-                    style: TextStyle(color: kText38, fontSize: 12)),
+                  '${r.exact ? 'O gün' : 'O günlerde'} ${r.plays} dinleme • '
+                  '${r.uniqueSongs} farklı şarkı',
+                  style: TextStyle(color: kText38, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -169,26 +181,27 @@ class _ThrowbackCardState extends State<ThrowbackCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(it.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: song == null ? kText38 : kText)),
-                  Text(it.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: kText60, fontSize: 12)),
+                  Text(
+                    it.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: song == null ? kText38 : kText,
+                    ),
+                  ),
+                  Text(
+                    it.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: kText60, fontSize: 12),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Text('${it.count} kez',
-                style: TextStyle(color: kText60, fontSize: 12)),
-            if (song != null) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.play_arrow, color: kGreen),
-            ],
+            Text('${it.count} kez', style: TextStyle(color: kText60, fontSize: 12)),
+            if (song != null) ...[const SizedBox(width: 4), Icon(Icons.play_arrow, color: kGreen)],
           ],
         ),
       ),

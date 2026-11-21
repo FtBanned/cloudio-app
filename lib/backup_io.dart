@@ -82,8 +82,7 @@ Future<String> writeBackupFile({
   final now = DateTime.now();
   String two(int v) => v.toString().padLeft(2, '0');
   final stamp = '${now.year}-${two(now.month)}-${two(now.day)}';
-  final path =
-      '${tmp.path}/Cloudio-yedek-$stamp-${full ? 'tam' : 'hafif'}.$kBackupExt';
+  final path = '${tmp.path}/Cloudio-yedek-$stamp-${full ? 'tam' : 'hafif'}.$kBackupExt';
   final out = File(path);
   if (await out.exists()) await out.delete();
 
@@ -92,8 +91,7 @@ Future<String> writeBackupFile({
   var ok = false;
   try {
     await raf.writeFrom(ascii.encode(_magic));
-    await _writeEntry(
-        raf, 'manifest.json', utf8.encode(jsonEncode(manifest.toJson())));
+    await _writeEntry(raf, 'manifest.json', utf8.encode(jsonEncode(manifest.toJson())));
     await _writeEntry(raf, 'db.json', dbBytes);
 
     final total = dbBytes.length + audioBytes;

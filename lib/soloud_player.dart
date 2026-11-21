@@ -99,39 +99,34 @@ class SoloudPlayer {
   Future<Duration?> setFilePath(String path, {Duration? initialPosition}) {
     final p = path.toLowerCase();
     final native = p.endsWith('.m4a') || p.endsWith('.aac') || p.endsWith('.mp4');
-    return _load(
-      () async {
-        if (!native) return SoLoud.instance.loadFile(path, mode: LoadMode.disk);
-        // m4a/aac (telefonun öz dekoderi): əvvəl disk rejimi; alınmazsa və ya
-        // uzunluq 0 çıxarsa yaddaş rejimi ilə yenidən yoxlanır.
+    return _load(() async {
+      if (!native) return SoLoud.instance.loadFile(path, mode: LoadMode.disk);
+      // m4a/aac (telefonun öz dekoderi): əvvəl disk rejimi; alınmazsa və ya
+      // uzunluq 0 çıxarsa yaddaş rejimi ilə yenidən yoxlanır.
+      try {
+        final s = await SoLoud.instance.loadFile(path, mode: LoadMode.disk);
+        if (SoLoud.instance.getLength(s) > Duration.zero) return s;
         try {
-          final s = await SoLoud.instance.loadFile(path, mode: LoadMode.disk);
-          if (SoLoud.instance.getLength(s) > Duration.zero) return s;
-          try {
-            await SoLoud.instance.disposeSource(s);
-          } catch (e) {
-            audioLog('m4a: ilkin mənbə dispose olunmadı', e);
-          }
+          await SoLoud.instance.disposeSource(s);
         } catch (e) {
-          debugPrint('[Cloudio] m4a/aac disk rejimi alınmadı, yaddaş rejimi: $e');
+          audioLog('m4a: ilkin mənbə dispose olunmadı', e);
         }
-        return SoLoud.instance.loadFile(path, mode: LoadMode.memory);
-      },
-      initialPosition,
-    );
+      } catch (e) {
+        debugPrint('[Cloudio] m4a/aac disk rejimi alınmadı, yaddaş rejimi: $e');
+      }
+      return SoLoud.instance.loadFile(path, mode: LoadMode.memory);
+    }, initialPosition);
   }
 
   /// Veb-də: fayl yolu yoxdur, baytlardan yaddaşa yüklənir.
-  Future<Duration?> setBytes(Uint8List bytes,
-      {required String name, Duration? initialPosition}) {
+  Future<Duration?> setBytes(Uint8List bytes, {required String name, Duration? initialPosition}) {
     return _load(
       () => SoLoud.instance.loadMem(name, bytes, mode: LoadMode.memory),
       initialPosition,
     );
   }
 
-  Future<Duration?> _load(
-      Future<AudioSource> Function() loader, Duration? initialPosition) async {
+  Future<Duration?> _load(Future<AudioSource> Function() loader, Duration? initialPosition) async {
     final seq = ++_loadSeq;
     _setPs(ProcessingState.loading);
     await _release();

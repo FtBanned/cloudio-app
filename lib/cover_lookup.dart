@@ -31,8 +31,16 @@ class CoverHit {
   /// true: "yakın sonuç" son çaresiyle bulundu; elle seçimdeki gibi ad, sanatçı ve albüm de
   /// bulunan sonuca göre doldurulur.
   final bool forceInfo;
-  const CoverHit(this.bytes, this.title, this.artist, this.album, this.source,
-      {this.swapped = false, this.score = 0, this.forceInfo = false});
+  const CoverHit(
+    this.bytes,
+    this.title,
+    this.artist,
+    this.album,
+    this.source, {
+    this.swapped = false,
+    this.score = 0,
+    this.forceInfo = false,
+  });
 }
 
 class _Cand {
@@ -51,8 +59,7 @@ class CoverCandidate {
   final String album;
   final String thumbUrl;
   final String artUrl;
-  const CoverCandidate(
-      this.title, this.artist, this.album, this.thumbUrl, this.artUrl);
+  const CoverCandidate(this.title, this.artist, this.album, this.thumbUrl, this.artUrl);
 }
 
 // ------------------------------------------------------------ dosya adı çözümleme
@@ -62,9 +69,12 @@ class CoverCandidate {
 String tidyName(String s) => s
     .replaceAll('_', ' ')
     .replaceAll(
-        RegExp(r'[\(\[]?\s*(?:https?://)?(?:www\.)?[\w-]+\.(?:com|net|org|az|ru|tr|info|biz|me|tv|fm|co|io|ws|ir)\s*[\)\]]?',
-            caseSensitive: false),
-        ' ')
+      RegExp(
+        r'[\(\[]?\s*(?:https?://)?(?:www\.)?[\w-]+\.(?:com|net|org|az|ru|tr|info|biz|me|tv|fm|co|io|ws|ir)\s*[\)\]]?',
+        caseSensitive: false,
+      ),
+      ' ',
+    )
     .replaceFirst(RegExp(r'^\s*\d{1,3}\s*[\.\-–)]\s+'), '')
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
@@ -90,11 +100,7 @@ String _stripFeat(String s) => s
 /// Bulunamazsa null. Hiçbir kaynağa ulaşılamadıysa (ağ/CORS) istisna fırlatır,
 /// böylece üst katman "bulunamadı" diye kalıcı işaretlemez.
 /// [minScore]: bilinmeyen sanatçıda yanlış adlandırmamak için daha yüksek tutulur.
-Future<CoverHit?> findCover({
-  required String title,
-  String artist = '',
-  String album = '',
-}) async {
+Future<CoverHit?> findCover({required String title, String artist = '', String album = ''}) async {
   final qTitle = cleanForSearch(title);
   final qArtist = cleanForSearch(artist);
   if (qTitle.isEmpty) return null;
@@ -106,8 +112,7 @@ Future<CoverHit?> findCover({
     for (final q in [
       qArtist.isEmpty ? qTitle : '$qArtist $qTitle',
       if (qArtist.isNotEmpty) qTitle,
-      if (noFeat.isNotEmpty && noFeat != qTitle)
-        (qArtist.isEmpty ? noFeat : '$qArtist $noFeat'),
+      if (noFeat.isNotEmpty && noFeat != qTitle) (qArtist.isEmpty ? noFeat : '$qArtist $noFeat'),
     ])
       if (seen.add(_norm(q))) q,
   ];
@@ -143,15 +148,21 @@ Future<CoverHit?> findCover({
           if (best >= minScore) scored.add((best, swapped, c));
         }
         scored.sort((x, y) => y.$1.compareTo(x.$1));
-        debugPrint(
-            '[Kapak] "$q" · $name: ${cands.length} sonuç, ${scored.length} uygun');
+        debugPrint('[Kapak] "$q" · $name: ${cands.length} sonuç, ${scored.length} uygun');
         for (final (score, swapped, c) in scored.take(3)) {
           for (final url in c.arts) {
             final img = await _getImage(url);
             if (img != null) {
               debugPrint('[Kapak] "$q" · $name: BULUNDU (${score.toStringAsFixed(2)})');
-              return CoverHit(img, c.title, c.artist, c.album, name,
-                  swapped: swapped, score: score);
+              return CoverHit(
+                img,
+                c.title,
+                c.artist,
+                c.album,
+                name,
+                swapped: swapped,
+                score: score,
+              );
             }
           }
         }
@@ -186,10 +197,7 @@ Future<CoverHit?> findCover({
 /// Deezer və iTunes-da axtarır; sözlərin sırasına və ad/sənətçi yerinə baxmır (əl ilə
 /// axtarışdakı kimi), yalnız daha yumşaq eşiklə yoxlayır. Ad ilə sənətçi dəyişik
 /// yazılıbsa (Mahnı - Sənətçi) [CoverHit.swapped] true olur və tətbiq onları düzəldir.
-Future<CoverHit?> _fallbackCover({
-  required String title,
-  required String artist,
-}) async {
+Future<CoverHit?> _fallbackCover({required String title, required String artist}) async {
   final rawT = tidyName(title);
   final rawA = artist.isEmpty ? '' : tidyName(artist);
   final tTok = _tokens(rawT);
@@ -210,7 +218,8 @@ Future<CoverHit?> _fallbackCover({
   final calls = <(String, String, Future<List<_Cand>> Function())>[
     for (final q in queries.take(3)) ('Deezer', q, () => _deezer(q, limit: 15)),
     for (final q in queries.take(2)) ('iTunes-tr', q, () => _itunes(q, 'tr', limit: 12)),
-    if (queries.isNotEmpty) ('iTunes-us', queries.first, () => _itunes(queries.first, 'us', limit: 8)),
+    if (queries.isNotEmpty)
+      ('iTunes-us', queries.first, () => _itunes(queries.first, 'us', limit: 8)),
   ];
 
   for (final (name, q, fetch) in calls) {
@@ -222,17 +231,24 @@ Future<CoverHit?> _fallbackCover({
         if (m != null) scored.add((m.$1, m.$2, c));
       }
       scored.sort((x, y) => y.$1.compareTo(x.$1));
-      debugPrint(
-          '[Kapak] ehtiyat "$q" · $name: ${cands.length} sonuç, ${scored.length} uygun');
+      debugPrint('[Kapak] ehtiyat "$q" · $name: ${cands.length} sonuç, ${scored.length} uygun');
       for (final (score, swapped, c) in scored.take(5)) {
         for (final url in c.arts) {
           final img = await _getImage(url);
           if (img != null) {
             debugPrint(
-                '[Kapak] ehtiyat "$q" · $name: BULUNDU (${score.toStringAsFixed(2)}, '
-                '${c.artist} - ${c.title})');
-            return CoverHit(img, c.title, c.artist, c.album, 'ehtiyat-$name',
-                swapped: swapped, score: score);
+              '[Kapak] ehtiyat "$q" · $name: BULUNDU (${score.toStringAsFixed(2)}, '
+              '${c.artist} - ${c.title})',
+            );
+            return CoverHit(
+              img,
+              c.title,
+              c.artist,
+              c.album,
+              'ehtiyat-$name',
+              swapped: swapped,
+              score: score,
+            );
           }
         }
       }
@@ -275,10 +291,7 @@ List<String> _bestEffortQueries(String title, String artist) {
 /// Son çare: kapak MUTLAKA bulunmaya çalışılır. "İnternette ara" ile aynı aramayı yapar
 /// (sonuç çıkmazsa daha gevşek sorgular dener) ve girişe en yakın sonucu EŞİKSİZ seçer.
 /// Yanlış olursa kullanıcı düzenleme ekranından elle düzeltir.
-Future<CoverHit?> _bestEffortCover({
-  required String title,
-  required String artist,
-}) async {
+Future<CoverHit?> _bestEffortCover({required String title, required String artist}) async {
   final rawA = artist.isEmpty ? '' : tidyName(artist);
   final qTok = _tokens('$rawA ${tidyName(title)}');
   final queries = _bestEffortQueries(title, artist);
@@ -323,9 +336,9 @@ Future<CoverHit?> _bestEffortCover({
       final img = await _getImage(url);
       if (img != null) {
         debugPrint(
-            '[Kapak] yakın sonuç: SEÇİLDİ (${sc.toStringAsFixed(2)}, ${c.artist} - ${c.title})');
-        return CoverHit(img, c.title, c.artist, c.album, 'yakin-sonuc',
-            score: sc, forceInfo: true);
+          '[Kapak] yakın sonuç: SEÇİLDİ (${sc.toStringAsFixed(2)}, ${c.artist} - ${c.title})',
+        );
+        return CoverHit(img, c.title, c.artist, c.album, 'yakin-sonuc', score: sc, forceInfo: true);
       }
     }
   }
@@ -372,8 +385,15 @@ Future<List<CoverCandidate>> searchCandidates(String query) async {
     for (final c in cands) {
       if (c.arts.isEmpty) continue;
       if (!seen.add(_norm('${c.artist} ${c.title} ${c.album}'))) continue;
-      out.add(CoverCandidate(
-          c.title, c.artist, c.album, c.thumb.isEmpty ? c.arts.first : c.thumb, c.arts.first));
+      out.add(
+        CoverCandidate(
+          c.title,
+          c.artist,
+          c.album,
+          c.thumb.isEmpty ? c.arts.first : c.thumb,
+          c.arts.first,
+        ),
+      );
     }
   }
 
@@ -405,12 +425,13 @@ class MetaHit {
   final int trackNo;
   final int discNo;
   final String source;
-  const MetaHit(
-      {this.genre = '',
-      this.year = 0,
-      this.trackNo = 0,
-      this.discNo = 0,
-      this.source = ''});
+  const MetaHit({
+    this.genre = '',
+    this.year = 0,
+    this.trackNo = 0,
+    this.discNo = 0,
+    this.source = '',
+  });
 }
 
 class _MetaCand {
@@ -420,12 +441,14 @@ class _MetaCand {
   int trackNo;
   int discNo;
   final Future<void> Function(_MetaCand)? _detail; // ek istekle tamamlanacak kaynaklar
-  _MetaCand(this.base,
-      {this.genre = '',
-      this.year = 0,
-      this.trackNo = 0,
-      this.discNo = 0,
-      this._detail});
+  _MetaCand(
+    this.base, {
+    this.genre = '',
+    this.year = 0,
+    this.trackNo = 0,
+    this.discNo = 0,
+    this._detail,
+  });
 
   Future<void> resolve() async {
     final d = _detail;
@@ -465,8 +488,7 @@ Future<MetaHit?> findMeta({
     for (final q in [
       qArtist.isEmpty ? qTitle : '$qArtist $qTitle',
       if (qArtist.isNotEmpty) qTitle,
-      if (noFeat.isNotEmpty && noFeat != qTitle)
-        (qArtist.isEmpty ? noFeat : '$qArtist $noFeat'),
+      if (noFeat.isNotEmpty && noFeat != qTitle) (qArtist.isEmpty ? noFeat : '$qArtist $noFeat'),
     ])
       if (seen.add(_norm(q))) q,
   ];
@@ -478,9 +500,7 @@ Future<MetaHit?> findMeta({
   var discNo = 0;
   var src = '';
   bool done() =>
-      (!needGenre || genre.isNotEmpty) &&
-      (!needYear || year > 0) &&
-      (!needTrack || trackNo > 0);
+      (!needGenre || genre.isNotEmpty) && (!needYear || year > 0) && (!needTrack || trackNo > 0);
 
   final sources = <(String, Future<List<_MetaCand>> Function(String))>[
     ('Deezer', (q) => _deezerMeta(q)),
@@ -593,7 +613,9 @@ Future<MetaHit?> findMeta({
             discNo = m.discNo;
             got = true;
           }
-          debugPrint('[Bilgi] yakın sonuç "${m.base.artist} - ${m.base.title}": ${got ? 'BULUNDU' : 'alan yok'}');
+          debugPrint(
+            '[Bilgi] yakın sonuç "${m.base.artist} - ${m.base.title}": ${got ? 'BULUNDU' : 'alan yok'}',
+          );
           if (got) src = src.isEmpty ? 'yakin-sonuc' : '$src+yakin-sonuc';
         }
       }
@@ -603,8 +625,7 @@ Future<MetaHit?> findMeta({
   }
   if (reached == 0 && lastError != null) throw Exception(lastError);
   if (genre.isEmpty && year == 0 && trackNo == 0) return null;
-  return MetaHit(
-      genre: genre, year: year, trackNo: trackNo, discNo: discNo, source: src);
+  return MetaHit(genre: genre, year: year, trackNo: trackNo, discNo: discNo, source: src);
 }
 
 Future<List<_MetaCand>> _itunesMeta(String term, String country) async {
@@ -621,14 +642,20 @@ Future<List<_MetaCand>> _itunesMeta(String term, String country) async {
   final out = <_MetaCand>[];
   for (final r in (data['results'] as List? ?? const [])) {
     if (r is! Map) continue;
-    out.add(_MetaCand(
-      _Cand('${r['trackName'] ?? ''}', '${r['artistName'] ?? ''}',
-          '${r['collectionName'] ?? ''}', const []),
-      genre: '${r['primaryGenreName'] ?? ''}'.trim(),
-      year: _yearOf(r['releaseDate']),
-      trackNo: _asInt(r['trackNumber']),
-      discNo: _asInt(r['discNumber']),
-    ));
+    out.add(
+      _MetaCand(
+        _Cand(
+          '${r['trackName'] ?? ''}',
+          '${r['artistName'] ?? ''}',
+          '${r['collectionName'] ?? ''}',
+          const [],
+        ),
+        genre: '${r['primaryGenreName'] ?? ''}'.trim(),
+        year: _yearOf(r['releaseDate']),
+        trackNo: _asInt(r['trackNumber']),
+        discNo: _asInt(r['discNumber']),
+      ),
+    );
   }
   return out;
 }
@@ -648,41 +675,47 @@ Future<List<_MetaCand>> _deezerMeta(String term) async {
     final artist = r['artist'] is Map ? r['artist'] as Map : const {};
     final trackId = r['id'];
     final albumId = album['id'];
-    out.add(_MetaCand(
-      _Cand('${r['title'] ?? ''}', '${artist['name'] ?? ''}',
-          '${album['title'] ?? ''}', const []),
-      // Arama sonucunda tür/yıl/sıra yok: sadece en iyi eşleşme için ek istek atılır
-      detail: (m) async {
-        try {
-          final t = await _getJson(Uri.https('api.deezer.com', '/track/$trackId'), 300);
-          if (t is Map && t['error'] == null) {
-            m.trackNo = _asInt(t['track_position']);
-            m.discNo = _asInt(t['disk_number']);
-            m.year = _yearOf(t['release_date']);
-          }
-        } catch (_) {}
-        try {
-          if (albumId != null) {
-            final a = await _getJson(Uri.https('api.deezer.com', '/album/$albumId'), 300);
-            if (a is Map && a['error'] == null) {
-              final g = a['genres'] is Map ? (a['genres'] as Map)['data'] : null;
-              if (g is List) {
-                for (final x in g) {
-                  if (x is Map && _asInt(x['id']) > 0) {
-                    final n = '${x['name'] ?? ''}'.trim();
-                    if (n.isNotEmpty) {
-                      m.genre = n;
-                      break;
+    out.add(
+      _MetaCand(
+        _Cand(
+          '${r['title'] ?? ''}',
+          '${artist['name'] ?? ''}',
+          '${album['title'] ?? ''}',
+          const [],
+        ),
+        // Arama sonucunda tür/yıl/sıra yok: sadece en iyi eşleşme için ek istek atılır
+        detail: (m) async {
+          try {
+            final t = await _getJson(Uri.https('api.deezer.com', '/track/$trackId'), 300);
+            if (t is Map && t['error'] == null) {
+              m.trackNo = _asInt(t['track_position']);
+              m.discNo = _asInt(t['disk_number']);
+              m.year = _yearOf(t['release_date']);
+            }
+          } catch (_) {}
+          try {
+            if (albumId != null) {
+              final a = await _getJson(Uri.https('api.deezer.com', '/album/$albumId'), 300);
+              if (a is Map && a['error'] == null) {
+                final g = a['genres'] is Map ? (a['genres'] as Map)['data'] : null;
+                if (g is List) {
+                  for (final x in g) {
+                    if (x is Map && _asInt(x['id']) > 0) {
+                      final n = '${x['name'] ?? ''}'.trim();
+                      if (n.isNotEmpty) {
+                        m.genre = n;
+                        break;
+                      }
                     }
                   }
                 }
+                if (m.year == 0) m.year = _yearOf(a['release_date']);
               }
-              if (m.year == 0) m.year = _yearOf(a['release_date']);
             }
-          }
-        } catch (_) {}
-      },
-    ));
+          } catch (_) {}
+        },
+      ),
+    );
   }
   return out;
 }
@@ -690,10 +723,30 @@ Future<List<_MetaCand>> _deezerMeta(String term) async {
 // ------------------------------------------------------------ eşleştirme
 
 const _tr = {
-  'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-  'ə': 'e', 'Ə': 'e', 'â': 'a', 'î': 'i', 'û': 'u', 'é': 'e', 'è': 'e',
-  'á': 'a', 'à': 'a', 'ó': 'o', 'ú': 'u', 'ñ': 'n', 'Ç': 'c', 'Ğ': 'g',
-  'Ö': 'o', 'Ş': 's', 'Ü': 'u',
+  'ç': 'c',
+  'ğ': 'g',
+  'ı': 'i',
+  'İ': 'i',
+  'ö': 'o',
+  'ş': 's',
+  'ü': 'u',
+  'ə': 'e',
+  'Ə': 'e',
+  'â': 'a',
+  'î': 'i',
+  'û': 'u',
+  'é': 'e',
+  'è': 'e',
+  'á': 'a',
+  'à': 'a',
+  'ó': 'o',
+  'ú': 'u',
+  'ñ': 'n',
+  'Ç': 'c',
+  'Ğ': 'g',
+  'Ö': 'o',
+  'Ş': 's',
+  'Ü': 'u',
 };
 
 /// Küçük harf, Türkçe/Azerice harfler ASCII'ye, harf-rakam dışı her şey atılır.
@@ -713,16 +766,17 @@ String _norm(String s) {
 
 const _stop = {'feat', 'ft', 'featuring', 'the', 'and', 've', 'ile', 'vs', 'x', 'a'};
 
-List<String> _tokens(String s) =>
-    [for (final t in _norm(s).split(' ')) if (t.isNotEmpty && !_stop.contains(t)) t];
+List<String> _tokens(String s) => [
+  for (final t in _norm(s).split(' '))
+    if (t.isNotEmpty && !_stop.contains(t)) t,
+];
 
 int _lev(String a, String b) {
   var prev = List<int>.generate(b.length + 1, (i) => i);
   for (var i = 1; i <= a.length; i++) {
     final cur = List<int>.filled(b.length + 1, 0)..[0] = i;
     for (var j = 1; j <= b.length; j++) {
-      cur[j] = min(min(cur[j - 1] + 1, prev[j] + 1),
-          prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+      cur[j] = min(min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
     }
     prev = cur;
   }
@@ -778,7 +832,10 @@ double _score(_Cand c, String qTitle, String qArtist) {
   }
 
   final qa = _tokens(qArtist);
-  final title = max(_dice(qt, ct), _coverage(ct, qt) * (ct.length >= 2 || ct.first.length >= 4 ? 1 : 0.0));
+  final title = max(
+    _dice(qt, ct),
+    _coverage(ct, qt) * (ct.length >= 2 || ct.first.length >= 4 ? 1 : 0.0),
+  );
   if (title < 0.7) return 0;
   final artist = max(_coverage(qa, ca), _coverage(ca, qa));
   if (artist < 0.4) return 0;
@@ -852,13 +909,11 @@ Future<List<_Cand>> _itunes(String term, String country, {int limit = 10}) async
     if (r is! Map) continue;
     final art = (r['artworkUrl100'] as String?) ?? '';
     if (art.isEmpty) continue;
-    out.add(_Cand(
-      '${r['trackName'] ?? ''}',
-      '${r['artistName'] ?? ''}',
-      '${r['collectionName'] ?? ''}',
-      [art.replaceAll('100x100bb', '600x600bb')],
-      art,
-    ));
+    out.add(
+      _Cand('${r['trackName'] ?? ''}', '${r['artistName'] ?? ''}', '${r['collectionName'] ?? ''}', [
+        art.replaceAll('100x100bb', '600x600bb'),
+      ], art),
+    );
   }
   return out;
 }
@@ -878,17 +933,18 @@ Future<List<_Cand>> _deezer(String term, {int limit = 10}) async {
     final artist = r['artist'] is Map ? r['artist'] as Map : const {};
     final art = '${album['cover_xl'] ?? album['cover_big'] ?? ''}';
     if (art.isEmpty) continue;
-    out.add(_Cand('${r['title'] ?? ''}', '${artist['name'] ?? ''}',
-        '${album['title'] ?? ''}', [art],
-        '${album['cover_medium'] ?? album['cover'] ?? ''}'));
+    out.add(
+      _Cand('${r['title'] ?? ''}', '${artist['name'] ?? ''}', '${album['title'] ?? ''}', [
+        art,
+      ], '${album['cover_medium'] ?? album['cover'] ?? ''}'),
+    );
   }
   return out;
 }
 
 Future<List<_Cand>> _musicBrainz(String term) async {
   final data = await _getJson(
-    Uri.https('musicbrainz.org', '/ws/2/recording',
-        {'fmt': 'json', 'limit': '6', 'query': term}),
+    Uri.https('musicbrainz.org', '/ws/2/recording', {'fmt': 'json', 'limit': '6', 'query': term}),
     1100,
   );
   final out = <_Cand>[];
@@ -903,15 +959,12 @@ Future<List<_Cand>> _musicBrainz(String term) async {
     }
     final releases = (r['releases'] as List? ?? const []).whereType<Map>().toList();
     if (releases.isEmpty) continue;
-    out.add(_Cand(
-      '${r['title'] ?? ''}',
-      names.join(', '),
-      '${releases.first['title'] ?? ''}',
-      [
+    out.add(
+      _Cand('${r['title'] ?? ''}', names.join(', '), '${releases.first['title'] ?? ''}', [
         for (final rel in releases.take(3))
           'https://coverartarchive.org/release/${rel['id']}/front-500',
-      ],
-    ));
+      ]),
+    );
   }
   return out;
 }

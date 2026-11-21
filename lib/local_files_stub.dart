@@ -5,10 +5,7 @@ Future<void> initLocalFiles() async {}
 
 String? audioPathFor(String? file) => null;
 
-Future<String?> importAudioFile({
-  required String sourcePath,
-  required String fileName,
-}) async =>
+Future<String?> importAudioFile({required String sourcePath, required String fileName}) async =>
     null;
 
 Future<void> deleteAudioFile(String? file) async {}

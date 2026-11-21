@@ -40,9 +40,7 @@ class _SearchPageState extends State<SearchPage> {
                 children: [
                   ProfileAvatar(),
                   SizedBox(width: 12),
-                  Text('Ara',
-                      style:
-                          TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                  Text('Ara', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -67,18 +65,17 @@ class _SearchPageState extends State<SearchPage> {
                 child: q.isEmpty
                     ? _GenreBrowser(genres: groupGenres(c.songs))
                     : matchSongs.isEmpty
-                        ? Center(
-                            child: Text('Sonuç bulunamadı',
-                                style: TextStyle(color: kText60)),
-                          )
-                        : ListView.builder(
-                            itemCount: matchSongs.length,
-                            itemBuilder: (context, i) => SongTile(
-                              key: ValueKey(matchSongs[i].id),
-                              song: matchSongs[i],
-                              queue: matchSongs,
-                            ),
-                          ),
+                    ? Center(
+                        child: Text('Sonuç bulunamadı', style: TextStyle(color: kText60)),
+                      )
+                    : ListView.builder(
+                        itemCount: matchSongs.length,
+                        itemBuilder: (context, i) => SongTile(
+                          key: ValueKey(matchSongs[i].id),
+                          song: matchSongs[i],
+                          queue: matchSongs,
+                        ),
+                      ),
               ),
             ],
           ),
@@ -133,8 +130,10 @@ class _GenreBrowser extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
-            child: Text('Janrlara göz at',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Janrlara göz at',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ),
           GridView.count(
             crossAxisCount: 2,
@@ -149,9 +148,9 @@ class _GenreBrowser extends StatelessWidget {
                   g.name,
                   _colorFor(g.name),
                   subtitle: '${g.songs.length} şarkı',
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => CollectionPage.genre(g.name),
-                  )),
+                  onTap: () =>
+                      Navigator.of(context)
+                          .push(MaterialPageRoute(builder: (_) => CollectionPage.genre(g.name))),
                 ),
             ],
           ),
@@ -167,8 +166,7 @@ class CategoryTile extends StatelessWidget {
   final Color color;
   final String? subtitle;
   final VoidCallback? onTap;
-  const CategoryTile(this.label, this.color,
-      {super.key, this.subtitle, this.onTap});
+  const CategoryTile(this.label, this.color, {super.key, this.subtitle, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -176,10 +174,7 @@ class CategoryTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(8),
-        ),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
         alignment: Alignment.topLeft,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,9 +185,7 @@ class CategoryTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            if (subtitle != null)
-              Text(subtitle!,
-                  style: TextStyle(fontSize: 12, color: kText70)),
+            if (subtitle != null) Text(subtitle!, style: TextStyle(fontSize: 12, color: kText70)),
           ],
         ),
       ),

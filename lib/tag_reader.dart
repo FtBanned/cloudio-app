@@ -55,17 +55,86 @@ TagInfo readTags(Uint8List data, String ext) {
 
 /// ID3v1 standart janr siyahısı (indeks = janr nömrəsi).
 const _kGenres = [
-  'Blues', 'Classic Rock', 'Country', 'Dance', 'Disco', 'Funk', 'Grunge', 'Hip-Hop',
-  'Jazz', 'Metal', 'New Age', 'Oldies', 'Other', 'Pop', 'R&B', 'Rap', 'Reggae', 'Rock',
-  'Techno', 'Industrial', 'Alternative', 'Ska', 'Death Metal', 'Pranks', 'Soundtrack',
-  'Euro-Techno', 'Ambient', 'Trip-Hop', 'Vocal', 'Jazz+Funk', 'Fusion', 'Trance',
-  'Classical', 'Instrumental', 'Acid', 'House', 'Game', 'Sound Clip', 'Gospel', 'Noise',
-  'Alt. Rock', 'Bass', 'Soul', 'Punk', 'Space', 'Meditative', 'Instrumental Pop',
-  'Instrumental Rock', 'Ethnic', 'Gothic', 'Darkwave', 'Techno-Industrial', 'Electronic',
-  'Pop-Folk', 'Eurodance', 'Dream', 'Southern Rock', 'Comedy', 'Cult', 'Gangsta', 'Top 40',
-  'Christian Rap', 'Pop/Funk', 'Jungle', 'Native American', 'Cabaret', 'New Wave',
-  'Psychedelic', 'Rave', 'Showtunes', 'Trailer', 'Lo-Fi', 'Tribal', 'Acid Punk',
-  'Acid Jazz', 'Polka', 'Retro', 'Musical', 'Rock & Roll', 'Hard Rock',
+  'Blues',
+  'Classic Rock',
+  'Country',
+  'Dance',
+  'Disco',
+  'Funk',
+  'Grunge',
+  'Hip-Hop',
+  'Jazz',
+  'Metal',
+  'New Age',
+  'Oldies',
+  'Other',
+  'Pop',
+  'R&B',
+  'Rap',
+  'Reggae',
+  'Rock',
+  'Techno',
+  'Industrial',
+  'Alternative',
+  'Ska',
+  'Death Metal',
+  'Pranks',
+  'Soundtrack',
+  'Euro-Techno',
+  'Ambient',
+  'Trip-Hop',
+  'Vocal',
+  'Jazz+Funk',
+  'Fusion',
+  'Trance',
+  'Classical',
+  'Instrumental',
+  'Acid',
+  'House',
+  'Game',
+  'Sound Clip',
+  'Gospel',
+  'Noise',
+  'Alt. Rock',
+  'Bass',
+  'Soul',
+  'Punk',
+  'Space',
+  'Meditative',
+  'Instrumental Pop',
+  'Instrumental Rock',
+  'Ethnic',
+  'Gothic',
+  'Darkwave',
+  'Techno-Industrial',
+  'Electronic',
+  'Pop-Folk',
+  'Eurodance',
+  'Dream',
+  'Southern Rock',
+  'Comedy',
+  'Cult',
+  'Gangsta',
+  'Top 40',
+  'Christian Rap',
+  'Pop/Funk',
+  'Jungle',
+  'Native American',
+  'Cabaret',
+  'New Wave',
+  'Psychedelic',
+  'Rave',
+  'Showtunes',
+  'Trailer',
+  'Lo-Fi',
+  'Tribal',
+  'Acid Punk',
+  'Acid Jazz',
+  'Polka',
+  'Retro',
+  'Musical',
+  'Rock & Roll',
+  'Hard Rock',
 ];
 
 /// "(13)", "(13)Pop", "13" və ya "Pop" -> "Pop". Tanınmayan nömrə -> ''.
@@ -94,11 +163,9 @@ int _leadInt(String s) {
   return m == null ? 0 : int.parse(m.group(1)!);
 }
 
-int _be32(Uint8List b, int o) =>
-    b[o] * 16777216 + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
+int _be32(Uint8List b, int o) => b[o] * 16777216 + (b[o + 1] << 16) + (b[o + 2] << 8) + b[o + 3];
 
-int _le32(Uint8List b, int o) =>
-    b[o] + (b[o + 1] << 8) + (b[o + 2] << 16) + b[o + 3] * 16777216;
+int _le32(Uint8List b, int o) => b[o] + (b[o + 1] << 8) + (b[o + 2] << 16) + b[o + 3] * 16777216;
 
 int _syncsafe(Uint8List b, int o) =>
     ((b[o] & 0x7F) << 21) |
@@ -195,9 +262,7 @@ String _syltToLrc(Uint8List b) {
     p = _skipTerminated(b, p, enc);
     final end = (enc == 1 || enc == 2) ? p - 2 : p - 1;
     if (p + 4 > b.length || end < start) break;
-    final text = _decodeRaw(enc, Uint8List.sublistView(b, start, end))
-        .replaceAll('\n', ' ')
-        .trim();
+    final text = _decodeRaw(enc, Uint8List.sublistView(b, start, end)).replaceAll('\n', ' ').trim();
     final ms = _be32(b, p);
     p += 4;
     final mm = (ms ~/ 60000).toString().padLeft(2, '0');
@@ -426,11 +491,7 @@ TagInfo _readMp3(Uint8List d) {
 // ----------------------------------------------------------------------- FLAC
 
 TagInfo _readFlac(Uint8List d) {
-  if (d.length < 4 ||
-      d[0] != 0x66 ||
-      d[1] != 0x4C ||
-      d[2] != 0x61 ||
-      d[3] != 0x43) {
+  if (d.length < 4 || d[0] != 0x66 || d[1] != 0x4C || d[2] != 0x61 || d[3] != 0x43) {
     return TagInfo.empty;
   }
   var title = '', artist = '', album = '';
@@ -623,7 +684,6 @@ TagInfo _readMp4(Uint8List d) {
   );
 }
 
-
 // ---------------------------------------------------------------- süre
 
 /// Dosya baytlarından şarkı süresini hesaplar (etiket/başlıktan; çalmaya gerek yok).
@@ -667,8 +727,7 @@ class _Mp3Frame {
   final int bitrate; // kbps
   final int sampleRate;
   final int frameLen;
-  const _Mp3Frame(
-      this.mpeg1, this.mono, this.crc, this.bitrate, this.sampleRate, this.frameLen);
+  const _Mp3Frame(this.mpeg1, this.mono, this.crc, this.bitrate, this.sampleRate, this.frameLen);
   int get samples => mpeg1 ? 1152 : 576;
 }
 
@@ -722,8 +781,7 @@ Duration? _mp3Duration(Uint8List d) {
       if ((flags & 1) != 0) {
         final frames = _be32(d, x + 8);
         if (frames > 0) {
-          return Duration(
-              milliseconds: (frames * f.samples * 1000 / f.sampleRate).round());
+          return Duration(milliseconds: (frames * f.samples * 1000 / f.sampleRate).round());
         }
       }
     }
@@ -732,8 +790,7 @@ Duration? _mp3Duration(Uint8List d) {
     if (_tagAt(d, v, 'VBRI') && v + 18 <= d.length) {
       final frames = _be32(d, v + 14);
       if (frames > 0) {
-        return Duration(
-            milliseconds: (frames * f.samples * 1000 / f.sampleRate).round());
+        return Duration(milliseconds: (frames * f.samples * 1000 / f.sampleRate).round());
       }
     }
     // Sabit bitrate: ses baytları / bitrate
@@ -775,7 +832,6 @@ Duration? _mp4Duration(Uint8List d) {
   if (timescale <= 0 || dur <= 0) return null;
   return Duration(milliseconds: (dur * 1000 / timescale).round());
 }
-
 
 // ---------------------------------------------------------------- ReplayGain
 

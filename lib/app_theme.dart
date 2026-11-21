@@ -18,10 +18,10 @@ const kAccentColors = <(String, Color)>[
 ];
 
 String themeModeLabel(AppThemeMode m) => switch (m) {
-      AppThemeMode.dark => 'Koyu',
-      AppThemeMode.amoled => 'AMOLED',
-      AppThemeMode.light => 'Açık',
-    };
+  AppThemeMode.dark => 'Koyu',
+  AppThemeMode.amoled => 'AMOLED',
+  AppThemeMode.light => 'Açık',
+};
 
 /// Tətbiqin cari görünüşü. Rənglər (kGreen, kBg, kCard, kText...) buradan oxunur.
 class AppTheme extends ChangeNotifier {
@@ -37,21 +37,20 @@ class AppTheme extends ChangeNotifier {
   Color get accent => kAccentColors[accentIndex.clamp(0, kAccentColors.length - 1)].$2;
 
   Color get bg => switch (mode) {
-        AppThemeMode.dark => const Color(0xFF121212),
-        AppThemeMode.amoled => const Color(0xFF000000),
-        AppThemeMode.light => const Color(0xFFF6F6F6),
-      };
+    AppThemeMode.dark => const Color(0xFF121212),
+    AppThemeMode.amoled => const Color(0xFF000000),
+    AppThemeMode.light => const Color(0xFFF6F6F6),
+  };
 
   Color get card => switch (mode) {
-        AppThemeMode.dark => const Color(0xFF2A2A2A),
-        AppThemeMode.amoled => const Color(0xFF1A1A1A),
-        AppThemeMode.light => const Color(0xFFE4E4E4),
-      };
+    AppThemeMode.dark => const Color(0xFF2A2A2A),
+    AppThemeMode.amoled => const Color(0xFF1A1A1A),
+    AppThemeMode.light => const Color(0xFFE4E4E4),
+  };
 
   /// Yazı / ikon rəngi: tündə ağ, açıqda qara. [alpha] 0..255.
-  Color fg([int alpha = 255]) => isLight
-      ? Color.fromARGB(alpha, 18, 18, 18)
-      : Color.fromARGB(alpha, 255, 255, 255);
+  Color fg([int alpha = 255]) =>
+      isLight ? Color.fromARGB(alpha, 18, 18, 18) : Color.fromARGB(alpha, 255, 255, 255);
 
   /// Seçimi tətbiq edir, bütün ekranları yenidən qurur və bazaya yazır.
   void set({AppThemeMode? mode, int? accentIndex, bool save = true}) {
@@ -97,8 +96,11 @@ class AppTheme extends ChangeNotifier {
     return ThemeData(
       brightness: b,
       scaffoldBackgroundColor: background,
-      colorScheme: (dark ? const ColorScheme.dark() : const ColorScheme.light())
-          .copyWith(primary: accent, surface: background, onSurface: onBg),
+      colorScheme: (dark ? const ColorScheme.dark() : const ColorScheme.light()).copyWith(
+        primary: accent,
+        surface: background,
+        onSurface: onBg,
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
         foregroundColor: onBg,

@@ -7,16 +7,24 @@ import 'player_controller.dart';
 
 /// Şəxsi statistika səhifəsini açır (Ayarlar və profil kartından çağırılır).
 void openStats(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const StatsPage()),
-  );
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const StatsPage()));
 }
 
 enum _Range { thisMonth, lastMonth, all }
 
 const _trMonths = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  'Ocak',
+  'Şubat',
+  'Mart',
+  'Nisan',
+  'Mayıs',
+  'Haziran',
+  'Temmuz',
+  'Ağustos',
+  'Eylül',
+  'Ekim',
+  'Kasım',
+  'Aralık',
 ];
 
 String _dur(Duration d) {
@@ -65,8 +73,7 @@ _Data _build(PlayerController c, _Range r) {
   final songs = <String, _Agg>{};
   final genres = <String, _Agg>{};
 
-  void add(String id, String title, String artist, String genre, int count,
-      int ms) {
+  void add(String id, String title, String artist, String genre, int count, int ms) {
     d.plays += count;
     d.ms += ms;
     final sg = songs.putIfAbsent(id, () => _Agg(title, artist));
@@ -88,8 +95,14 @@ _Data _build(PlayerController c, _Range r) {
     // Bütün dinləmələr: mahnıların öz sayğacından (köhnə dinləmələr də daxil)
     for (final s in c.songs) {
       if (s.playCount <= 0) continue;
-      add(s.id, s.title, s.artist, s.genre, s.playCount,
-          (s.duration?.inMilliseconds ?? 0) * s.playCount);
+      add(
+        s.id,
+        s.title,
+        s.artist,
+        s.genre,
+        s.playCount,
+        (s.duration?.inMilliseconds ?? 0) * s.playCount,
+      );
     }
   } else {
     final now = DateTime.now();
@@ -126,8 +139,7 @@ class _StatsPageState extends State<StatsPage> {
     final c = PlayerController.instance;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kişisel istatistik',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Kişisel istatistik', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListenableBuilder(
         listenable: c,
@@ -141,8 +153,7 @@ class _StatsPageState extends State<StatsPage> {
             _Range.all => 'Tümü',
           };
           return ListView(
-            padding: EdgeInsets.fromLTRB(
-                16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
             children: [
               Wrap(
                 spacing: 8,
@@ -162,9 +173,10 @@ class _StatsPageState extends State<StatsPage> {
               const SizedBox(height: 16),
               if (d.plays == 0)
                 _Empty(
-                    text: _range == _Range.all
-                        ? 'Henüz hiçbir şey dinlemedin.\nBir şarkıyı 30 saniye dinle, burada görünecek.'
-                        : '$periodName için dinleme yok.')
+                  text: _range == _Range.all
+                      ? 'Henüz hiçbir şey dinlemedin.\nBir şarkıyı 30 saniye dinle, burada görünecek.'
+                      : '$periodName için dinleme yok.',
+                )
               else ...[
                 _HeroCard(data: d, period: periodName),
                 const SizedBox(height: 16),
@@ -179,11 +191,7 @@ class _StatsPageState extends State<StatsPage> {
                     },
                   ),
                   const _Gap(),
-                  _RankCard(
-                    title: 'En çok dinlenen sanatçılar',
-                    items: d.artists,
-                    unit: 'kez',
-                  ),
+                  _RankCard(title: 'En çok dinlenen sanatçılar', items: d.artists, unit: 'kez'),
                   const _Gap(),
                 ],
                 _RankCard(
@@ -194,17 +202,16 @@ class _StatsPageState extends State<StatsPage> {
                 ),
                 if (d.genres.isNotEmpty) ...[
                   const _Gap(),
-                  _RankCard(
-                      title: 'Janrlar', items: d.genres, unit: 'kez'),
+                  _RankCard(title: 'Janrlar', items: d.genres, unit: 'kez'),
                 ],
               ],
               if (_range != _Range.all && c.untrackedPlays > 0) ...[
                 const SizedBox(height: 12),
                 Text(
-                    'Not: güncellemeden önceki ${c.untrackedPlays} dinlemenin tarihi '
-                    'bilinmiyor, bu yüzden yalnızca "Tümü" bölümünde sayılır.',
-                    style:
-                        TextStyle(color: kText38, fontSize: 11)),
+                  'Not: güncellemeden önceki ${c.untrackedPlays} dinlemenin tarihi '
+                  'bilinmiyor, bu yüzden yalnızca "Tümü" bölümünde sayılır.',
+                  style: TextStyle(color: kText38, fontSize: 11),
+                ),
               ],
               const _Gap(),
               _ActivityCard(log: c.playLog),
@@ -226,8 +233,7 @@ class _RangeChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _RangeChip(
-      {required this.label, required this.selected, required this.onTap});
+  const _RangeChip({required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -239,10 +245,10 @@ class _RangeChip extends StatelessWidget {
           color: selected ? kGreen : kCard,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? Colors.black : kText,
-                fontWeight: FontWeight.w600)),
+        child: Text(
+          label,
+          style: TextStyle(color: selected ? Colors.black : kText, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -253,13 +259,15 @@ class _Empty extends StatelessWidget {
   const _Empty({required this.text});
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 64),
-        child: Center(
-          child: Text(text,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: kText60)),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 64),
+    child: Center(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(color: kText60),
+      ),
+    ),
+  );
 }
 
 class _Card extends StatelessWidget {
@@ -267,14 +275,11 @@ class _Card extends StatelessWidget {
   const _Card({required this.child});
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: kCard,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: child,
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(20)),
+    child: child,
+  );
 }
 
 /// "Ümumi dinləmə vaxtı" + dinləmə / fərqli mahnı sayı.
@@ -286,38 +291,42 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DarkZone(
-        child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0B5D2A), Color(0xFF121212)],
-        ),
-        border: Border.all(color: kGreen.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Toplam dinleme süresi • $period',
-              style: const TextStyle(color: Colors.white70, fontSize: 13)),
-          const SizedBox(height: 6),
-          Text(data.ms > 0 ? _dur(Duration(milliseconds: data.ms)) : '—',
-              style: TextStyle(
-                  fontSize: 36, fontWeight: FontWeight.bold, color: kGreen)),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _MiniStat(value: '${data.plays}', label: 'Dinleme'),
-              _MiniStat(value: '${data.uniqueSongs}', label: 'Farklı şarkı'),
-              _MiniStat(value: '${data.uniqueArtists}', label: 'Sanatçı'),
-            ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0B5D2A), Color(0xFF121212)],
           ),
-        ],
+          border: Border.all(color: kGreen.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Toplam dinleme süresi • $period',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              data.ms > 0 ? _dur(Duration(milliseconds: data.ms)) : '—',
+              style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: kGreen),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _MiniStat(value: '${data.plays}', label: 'Dinleme'),
+                _MiniStat(value: '${data.uniqueSongs}', label: 'Farklı şarkı'),
+                _MiniStat(value: '${data.uniqueArtists}', label: 'Sanatçı'),
+              ],
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }
 
@@ -327,25 +336,27 @@ class _MiniStat extends StatelessWidget {
   const _MiniStat({required this.value, required this.label});
   @override
   Widget build(BuildContext context) => Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value,
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(label,
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54), fontSize: 12)),
-          ],
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
+            fontSize: 12,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _TopArtistCard extends StatelessWidget {
   final _Agg artist;
   final int total;
   final String title;
-  const _TopArtistCard(
-      {required this.artist, required this.total, required this.title});
+  const _TopArtistCard({required this.artist, required this.total, required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -356,30 +367,33 @@ class _TopArtistCard extends StatelessWidget {
           CircleAvatar(
             radius: 30,
             backgroundColor: kGreen,
-            child: Text(artist.name.trim().characters.first.toUpperCase(),
-                style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold)),
+            child: Text(
+              artist.name.trim().characters.first.toUpperCase(),
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style:
-                        TextStyle(color: kText60, fontSize: 12)),
+                Text(title, style: TextStyle(color: kText60, fontSize: 12)),
                 const SizedBox(height: 4),
-                Text(artist.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(
+                  artist.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 2),
-                Text('${artist.count} dinleme • toplamın %$share',
-                    style:
-                        TextStyle(color: kText70, fontSize: 13)),
+                Text(
+                  '${artist.count} dinleme • toplamın %$share',
+                  style: TextStyle(color: kText70, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -395,11 +409,12 @@ class _RankCard extends StatelessWidget {
   final List<_Agg> items;
   final String unit;
   final bool showSub;
-  const _RankCard(
-      {required this.title,
-      required this.items,
-      required this.unit,
-      this.showSub = false});
+  const _RankCard({
+    required this.title,
+    required this.items,
+    required this.unit,
+    this.showSub = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -408,9 +423,7 @@ class _RankCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           for (var i = 0; i < items.length; i++)
             Padding(
@@ -422,23 +435,28 @@ class _RankCard extends StatelessWidget {
                     children: [
                       SizedBox(
                         width: 22,
-                        child: Text('${i + 1}',
-                            style: TextStyle(
-                                color: i == 0 ? kGreen : kText54,
-                                fontWeight: FontWeight.bold)),
+                        child: Text(
+                          '${i + 1}',
+                          style: TextStyle(
+                            color: i == 0 ? kGreen : kText54,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                       Expanded(
                         child: Text(
-                            showSub && items[i].sub.isNotEmpty
-                                ? '${items[i].name} • ${items[i].sub}'
-                                : items[i].name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                          showSub && items[i].sub.isNotEmpty
+                              ? '${items[i].name} • ${items[i].sub}'
+                              : items[i].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      Text('${items[i].count} $unit',
-                          style: TextStyle(
-                              color: kText60, fontSize: 12)),
+                      Text(
+                        '${items[i].count} $unit',
+                        style: TextStyle(color: kText60, fontSize: 12),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -448,8 +466,7 @@ class _RankCard extends StatelessWidget {
                       value: items[i].count / maxCount,
                       minHeight: 5,
                       backgroundColor: kText12,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          i == 0 ? kGreen : kText38),
+                      valueColor: AlwaysStoppedAnimation<Color>(i == 0 ? kGreen : kText38),
                     ),
                   ),
                 ],
@@ -481,18 +498,13 @@ class _ActivityCard extends StatelessWidget {
 
     // ardıcıl günlər (bu gün dinləməyibsə dünəndən sayılır)
     var streak = 0;
-    var d = perDay.containsKey(today)
-        ? today
-        : DateTime(today.year, today.month, today.day - 1);
+    var d = perDay.containsKey(today) ? today : DateTime(today.year, today.month, today.day - 1);
     while (perDay.containsKey(d)) {
       streak++;
       d = DateTime(d.year, d.month, d.day - 1);
     }
 
-    final days = [
-      for (var i = 13; i >= 0; i--)
-        DateTime(today.year, today.month, today.day - i),
-    ];
+    final days = [for (var i = 13; i >= 0; i--) DateTime(today.year, today.month, today.day - i)];
     final counts = [for (final x in days) perDay[x] ?? 0];
     final maxC = counts.fold<int>(0, (m, v) => v > m ? v : m);
 
@@ -507,21 +519,22 @@ class _ActivityCard extends StatelessWidget {
     String part(int h) => h >= 5 && h < 12
         ? 'sabah'
         : h >= 12 && h < 17
-            ? 'gündüz'
-            : h >= 17 && h < 22
-                ? 'akşam'
-                : 'gece';
+        ? 'gündüz'
+        : h >= 17 && h < 22
+        ? 'akşam'
+        : 'gece';
 
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Etkinlik • son 14 gün',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text(
+            'Etkinlik • son 14 gün',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 14),
           if (maxC == 0)
-            Text('Son 14 günde dinleme yok.',
-                style: TextStyle(color: kText54, fontSize: 13))
+            Text('Son 14 günde dinleme yok.', style: TextStyle(color: kText54, fontSize: 13))
           else
             SizedBox(
               height: 96,
@@ -536,25 +549,24 @@ class _ActivityCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Container(
-                              height: counts[i] == 0
-                                  ? 3
-                                  : 4 + 56 * counts[i] / maxC,
+                              height: counts[i] == 0 ? 3 : 4 + 56 * counts[i] / maxC,
                               decoration: BoxDecoration(
                                 color: counts[i] == 0
                                     ? kText12
                                     : (i == days.length - 1
-                                        ? kGreen
-                                        : kGreen.withValues(alpha: 0.6)),
+                                          ? kGreen
+                                          : kGreen.withValues(alpha: 0.6)),
                                 borderRadius: BorderRadius.circular(3),
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text('${days[i].day}',
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    color: i == days.length - 1
-                                        ? kGreen
-                                        : kText38)),
+                            Text(
+                              '${days[i].day}',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: i == days.length - 1 ? kGreen : kText38,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -565,16 +577,11 @@ class _ActivityCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
+              _MiniStat(value: streak == 0 ? '—' : '$streak gün', label: 'Üst üste dinleme'),
               _MiniStat(
-                  value: streak == 0 ? '—' : '$streak gün',
-                  label: 'Üst üste dinleme'),
-              _MiniStat(
-                  value: peakHour < 0
-                      ? '—'
-                      : '${peakHour.toString().padLeft(2, '0')}:00',
-                  label: peakHour < 0
-                      ? 'En aktif saat'
-                      : 'En aktif saat (${part(peakHour)})'),
+                value: peakHour < 0 ? '—' : '${peakHour.toString().padLeft(2, '0')}:00',
+                label: peakHour < 0 ? 'En aktif saat' : 'En aktif saat (${part(peakHour)})',
+              ),
             ],
           ),
         ],

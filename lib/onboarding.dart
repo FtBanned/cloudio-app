@@ -12,12 +12,9 @@ const bool kOnboardingForceShow = false;
 
 /// Qarşılama ekranını əl ilə açır (Ayarlar → Hakkında). "Görüldü" qeydinə toxunmur.
 void openOnboarding(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      fullscreenDialog: true,
-      builder: (_) => const OnboardingPage(),
-    ),
-  );
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const OnboardingPage()));
 }
 
 bool _checkedThisRun = false;
@@ -77,11 +74,7 @@ const _slides = <_Slide>[
         'telefonundaki müzik dosyalarını seç (mp3, m4a, flac ve diğerleri). '
         'Kapak ve sözler internetten otomatik aranır.',
   ),
-  _Slide(
-    Icons.auto_awesome,
-    'Neler yapabilirsin',
-    '',
-  ),
+  _Slide(Icons.auto_awesome, 'Neler yapabilirsin', ''),
   _Slide(
     Icons.cloud_upload_outlined,
     'Yedek al',
@@ -122,8 +115,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (_last) {
       _finish(saveName: true);
     } else {
-      _pc.nextPage(
-          duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
+      _pc.nextPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOut);
     }
   }
 
@@ -154,8 +146,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ? const SizedBox.shrink()
                       : TextButton(
                           onPressed: () => _finish(saveName: false),
-                          child: Text('Atla',
-                              style: TextStyle(color: kText54, fontSize: 15)),
+                          child: Text('Atla', style: TextStyle(color: kText54, fontSize: 15)),
                         ),
                 ),
               ),
@@ -198,9 +189,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   height: 52,
                   child: FilledButton(
                     onPressed: _next,
-                    child: Text(_last ? 'Başla' : 'Devam',
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      _last ? 'Başla' : 'Devam',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ),
@@ -253,15 +245,18 @@ class _SlideView extends StatelessWidget {
               child: Icon(slide.icon, size: 60, color: kGreen),
             ),
             const SizedBox(height: 32),
-            Text(slide.title,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            Text(
+              slide.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            ),
             if (slide.body.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Text(slide.body,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: kText60, fontSize: 15, height: 1.5)),
+              Text(
+                slide.body,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: kText60, fontSize: 15, height: 1.5),
+              ),
             ],
             ?extra,
           ],
@@ -299,11 +294,11 @@ class _FeatureList extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(it.$2,
-                            style: TextStyle(
-                                color: kText, fontWeight: FontWeight.w600)),
-                        Text(it.$3,
-                            style: TextStyle(color: kText60, fontSize: 12)),
+                        Text(
+                          it.$2,
+                          style: TextStyle(color: kText, fontWeight: FontWeight.w600),
+                        ),
+                        Text(it.$3, style: TextStyle(color: kText60, fontSize: 12)),
                       ],
                     ),
                   ),

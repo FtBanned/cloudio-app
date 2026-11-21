@@ -12,8 +12,18 @@ import 'player_controller.dart';
 const bool kBackupReminderWebTest = false;
 
 const _months = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  'Ocak',
+  'Şubat',
+  'Mart',
+  'Nisan',
+  'Mayıs',
+  'Haziran',
+  'Temmuz',
+  'Ağustos',
+  'Eylül',
+  'Ekim',
+  'Kasım',
+  'Aralık',
 ];
 
 /// Yedək xatırlatması: son yedəyin vaxtını saxlayır və "çox keçib" olanda xəbərdarlıq göstərir.
@@ -51,11 +61,13 @@ class BackupReminder extends ChangeNotifier {
   }
 
   void _save() {
-    unawaited(CloudioStore.instance.saveBackupInfo(<String, Object?>{
-      'last': lastBackupMs,
-      'snooze': snoozeUntilMs,
-      'weeks': weeks,
-    }));
+    unawaited(
+      CloudioStore.instance.saveBackupInfo(<String, Object?>{
+        'last': lastBackupMs,
+        'snooze': snoozeUntilMs,
+        'weeks': weeks,
+      }),
+    );
   }
 
   /// Yedək faylı yaradılanda (və ya yedəkdən bərpa olunanda) çağırılır.
@@ -83,12 +95,8 @@ class BackupReminder extends ChangeNotifier {
 
   /// Son yedəkdən (yoxdursa hesabın yaradıldığı gündən) keçən gün.
   int daysSince(PlayerController c) {
-    final ref = lastBackupMs > 0
-        ? lastBackupMs
-        : c.profileSince.millisecondsSinceEpoch;
-    return DateTime.now()
-        .difference(DateTime.fromMillisecondsSinceEpoch(ref))
-        .inDays;
+    final ref = lastBackupMs > 0 ? lastBackupMs : c.profileSince.millisecondsSinceEpoch;
+    return DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ref)).inDays;
   }
 
   bool shouldShow(PlayerController c) {
@@ -130,20 +138,18 @@ class BackupReminderBanner extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.cloud_upload_outlined,
-                          color: Colors.orangeAccent),
+                      const Icon(Icons.cloud_upload_outlined, color: Colors.orangeAccent),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
+                            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 2),
                             Text(
-                                'Uygulamayı silersen kitaplığın ve ayarların kaybolur.',
-                                style: TextStyle(color: kText60, fontSize: 12)),
+                              'Uygulamayı silersen kitaplığın ve ayarların kaybolur.',
+                              style: TextStyle(color: kText60, fontSize: 12),
+                            ),
                           ],
                         ),
                       ),
@@ -158,8 +164,7 @@ class BackupReminderBanner extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () => openBackupPage(context),
-                        child:
-                            Text('Yedek al', style: TextStyle(color: kGreen)),
+                        child: Text('Yedek al', style: TextStyle(color: kGreen)),
                       ),
                     ],
                   ),
@@ -191,23 +196,20 @@ class BackupReminderSettings extends StatelessWidget {
         } else {
           final d = DateTime.fromMillisecondsSinceEpoch(r.lastBackupMs);
           final days = r.daysSince(c);
-          last = 'Son yedek: ${d.day} ${_months[d.month - 1]} ${d.year} '
+          last =
+              'Son yedek: ${d.day} ${_months[d.month - 1]} ${d.year} '
               '• ${days == 0 ? 'bugün' : '$days gün önce'}';
         }
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: kCard,
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: BoxDecoration(color: kCard, borderRadius: BorderRadius.circular(12)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(last, style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 10),
-              Text('Yedek hatırlatması',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+              Text('Yedek hatırlatması', style: TextStyle(color: kText54, fontSize: 12)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -217,28 +219,30 @@ class BackupReminderSettings extends StatelessWidget {
                     GestureDetector(
                       onTap: () => r.setWeeks(w),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
                           color: r.weeks == w ? kGreen : Colors.transparent,
-                          border: Border.all(
-                              color: r.weeks == w ? kGreen : kText54),
+                          border: Border.all(color: r.weeks == w ? kGreen : kText54),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(w == 0 ? 'Kapalı' : '$w hafta',
-                            style: TextStyle(
-                                color: r.weeks == w ? Colors.black : kText,
-                                fontWeight: FontWeight.w600)),
+                        child: Text(
+                          w == 0 ? 'Kapalı' : '$w hafta',
+                          style: TextStyle(
+                            color: r.weeks == w ? Colors.black : kText,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
-                  r.weeks == 0
-                      ? 'Hatırlatma kapalı.'
-                      : 'Yedek ${r.weeks} haftadır alınmadıysa ana sayfada uyarılır.',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                r.weeks == 0
+                    ? 'Hatırlatma kapalı.'
+                    : 'Yedek ${r.weeks} haftadır alınmadıysa ana sayfada uyarılır.',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
             ],
           ),
         );

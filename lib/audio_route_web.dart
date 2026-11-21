@@ -17,9 +17,7 @@ class AudioRouteWatcher {
   JSFunction? _listener;
 
   Future<int> _outputCount() async {
-    final list = await web.window.navigator.mediaDevices
-        .enumerateDevices()
-        .toDart;
+    final list = await web.window.navigator.mediaDevices.enumerateDevices().toDart;
     return list.toDart.where((d) => d.kind == 'audiooutput').length;
   }
 

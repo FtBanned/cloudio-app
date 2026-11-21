@@ -14,8 +14,7 @@ void showBoosterSheet(BuildContext context) {
     ),
     builder: (ctx) => SafeArea(
       child: ConstrainedBox(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Column(
@@ -43,9 +42,7 @@ void showBoosterSheet(BuildContext context) {
 
 /// Tam səhifə (Ayarlar-dan və "Gelişmiş ayarlar"-dan).
 void openBoosterPage(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const BoosterPage()),
-  );
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const BoosterPage()));
 }
 
 class BoosterPage extends StatelessWidget {
@@ -56,12 +53,10 @@ class BoosterPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text('Ses güçlendirici',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Ses güçlendirici', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(
-            16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
         children: const [BoosterPanel(advanced: true)],
       ),
     );
@@ -84,10 +79,10 @@ class _Chip extends StatelessWidget {
           color: selected ? kGreen : kBg,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? Colors.black : kText,
-                fontWeight: FontWeight.w600)),
+        child: Text(
+          label,
+          style: TextStyle(color: selected ? Colors.black : kText, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
@@ -141,13 +136,16 @@ class BoosterPanel extends StatelessWidget {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeThumbColor: kGreen,
-              title: const Text('Ses güçlendirici',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              title: const Text(
+                'Ses güçlendirici',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               subtitle: Text(
-                  b.engineReady
-                      ? 'Açıkken ses ${multTxt}x (+${b.targetDb.toStringAsFixed(1)} dB) güçlenir'
-                      : 'Ses motoru başlamadı: güçlendirici çalışmaz',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                b.engineReady
+                    ? 'Açıkken ses ${multTxt}x (+${b.targetDb.toStringAsFixed(1)} dB) güçlenir'
+                    : 'Ses motoru başlamadı: güçlendirici çalışmaz',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
               value: b.enabled,
               onChanged: b.engineReady
                   ? (v) {
@@ -157,8 +155,10 @@ class BoosterPanel extends StatelessWidget {
                   : null,
             ),
             const SizedBox(height: 4),
-            Text('Güçlendirme: ${multTxt}x',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              'Güçlendirme: ${multTxt}x',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -203,8 +203,9 @@ class BoosterPanel extends StatelessWidget {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                          'TEHLİKELİ SEVİYE: işitmene kalıcı zarar verebilir. Sesi düşür.',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        'TEHLİKELİ SEVİYE: işitmene kalıcı zarar verebilir. Sesi düşür.',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
@@ -218,12 +219,12 @@ class BoosterPanel extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                    'Yüksek seviye: kulaklıkla çok dikkatli ol. Önce telefonun sesini azalt.',
-                    style: TextStyle(fontSize: 12)),
+                  'Yüksek seviye: kulaklıkla çok dikkatli ol. Önce telefonun sesini azalt.',
+                  style: TextStyle(fontSize: 12),
+                ),
               ),
             const SizedBox(height: 4),
-            const Text('Netlik',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text('Netlik', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -246,8 +247,7 @@ class BoosterPanel extends StatelessWidget {
                   builder: (ctx) => AlertDialog(
                     backgroundColor: kCard,
                     title: const Text('Ayarlar sıfırlansın mı?'),
-                    content: const Text(
-                        'Güçlendirici kapanır, tüm değerler varsayılana döner.'),
+                    content: const Text('Güçlendirici kapanır, tüm değerler varsayılana döner.'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx),
@@ -269,12 +269,16 @@ class BoosterPanel extends StatelessWidget {
             ),
             if (advanced) ...[
               const SizedBox(height: 16),
-              Text('Gelişmiş (elle)',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.bold, color: kText54)),
+              Text(
+                'Gelişmiş (elle)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: kText54),
+              ),
               _slider(
                 'Ek güçlendirme: +${b.extraDb.toStringAsFixed(0)} dB',
-                b.extraDb, 0, 12, 12,
+                b.extraDb,
+                0,
+                12,
+                12,
                 b.previewExtra,
                 (v) {
                   b.setExtraDb(v);
@@ -283,7 +287,10 @@ class BoosterPanel extends StatelessWidget {
               ),
               _slider(
                 'Sıkıştırma oranı: ${b.ratio.toStringAsFixed(1)} (1 = yok)',
-                b.ratio, 1, 8, 14,
+                b.ratio,
+                1,
+                8,
+                14,
                 (v) => b.setAdvanced(ratio: v),
                 (v) {
                   b.setAdvanced(ratio: v, commit: true);
@@ -292,7 +299,10 @@ class BoosterPanel extends StatelessWidget {
               ),
               _slider(
                 'Sıkıştırma eşiği: ${b.threshold.toStringAsFixed(0)} dB',
-                b.threshold, -60, 0, 60,
+                b.threshold,
+                -60,
+                0,
+                60,
                 (v) => b.setAdvanced(threshold: v),
                 (v) {
                   b.setAdvanced(threshold: v, commit: true);
@@ -301,7 +311,10 @@ class BoosterPanel extends StatelessWidget {
               ),
               _slider(
                 'Limiter sürüklemesi: ${b.limThreshold.toStringAsFixed(0)} dB (düşük = daha yüksek/sıkı)',
-                b.limThreshold, -24, 0, 24,
+                b.limThreshold,
+                -24,
+                0,
+                24,
                 (v) => b.setAdvanced(limThreshold: v),
                 (v) {
                   b.setAdvanced(limThreshold: v, commit: true);
@@ -310,7 +323,10 @@ class BoosterPanel extends StatelessWidget {
               ),
               _slider(
                 'Tavan: ${b.limCeiling.toStringAsFixed(1)} dB (0\'a yakın = daha yüksek, riskli)',
-                b.limCeiling, -12, 0, 24,
+                b.limCeiling,
+                -12,
+                0,
+                24,
                 (v) => b.setAdvanced(limCeiling: v),
                 (v) {
                   b.setAdvanced(limCeiling: v, commit: true);
@@ -318,31 +334,34 @@ class BoosterPanel extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 8),
-              Text('EQ bantları (1.0 = değişmez, 2.0 ≈ +6 dB)',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+              Text(
+                'EQ bantları (1.0 = değişmez, 2.0 ≈ +6 dB)',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
               for (var i = 0; i < Booster.kBands; i++)
                 Row(
                   children: [
                     SizedBox(
-                        width: 28,
-                        child: Text('${i + 1}',
-                            style: TextStyle(color: kText38, fontSize: 12))),
+                      width: 28,
+                      child: Text('${i + 1}', style: TextStyle(color: kText38, fontSize: 12)),
+                    ),
                     Expanded(
                       child: Slider(
                         activeColor: kGreen,
                         value: b.bandGain[i],
                         min: 0,
                         max: 4,
-                        onChanged: (v) =>
-                            b.setAdvanced(band: i, bandValue: v),
-                        onChangeEnd: (v) =>
-                            b.setAdvanced(band: i, bandValue: v, commit: true),
+                        onChanged: (v) => b.setAdvanced(band: i, bandValue: v),
+                        onChangeEnd: (v) => b.setAdvanced(band: i, bandValue: v, commit: true),
                       ),
                     ),
                     SizedBox(
-                        width: 36,
-                        child: Text(b.bandGain[i].toStringAsFixed(1),
-                            style: const TextStyle(fontSize: 12))),
+                      width: 36,
+                      child: Text(
+                        b.bandGain[i].toStringAsFixed(1),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
                   ],
                 ),
             ],
@@ -352,8 +371,15 @@ class BoosterPanel extends StatelessWidget {
     );
   }
 
-  Widget _slider(String text, double value, double min, double max, int div,
-      ValueChanged<double> onChanged, ValueChanged<double> onEnd) {
+  Widget _slider(
+    String text,
+    double value,
+    double min,
+    double max,
+    int div,
+    ValueChanged<double> onChanged,
+    ValueChanged<double> onEnd,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

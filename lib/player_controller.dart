@@ -86,9 +86,8 @@ class Song {
     required this.ext,
     this.lyrics,
     this.duration,
-  })  : lyricsStatus =
-            lyrics != null ? LyricsStatus.found : LyricsStatus.idle,
-        coverStatus = cover != null ? CoverStatus.found : CoverStatus.idle;
+  }) : lyricsStatus = lyrics != null ? LyricsStatus.found : LyricsStatus.idle,
+       coverStatus = cover != null ? CoverStatus.found : CoverStatus.idle;
 }
 
 class Playlist {
@@ -108,8 +107,10 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // ---- qulaqlıq çıxanda avto-pauza, taxılanda avto-davam ----
-  late final AudioRouteWatcher _route =
-      AudioRouteWatcher(onRemoved: _onRouteRemoved, onAdded: _onRouteAdded);
+  late final AudioRouteWatcher _route = AudioRouteWatcher(
+    onRemoved: _onRouteRemoved,
+    onAdded: _onRouteAdded,
+  );
   bool _autoPausedByRoute = false; // qulaqlıq çıxdığı üçün dayanıb
   bool _userPaused = false; // istifadəçi / sleep timer / siyahı sonu dayandırıb
   bool _wasPlaying = false;
@@ -130,7 +131,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   void _onRouteRemoved() {
     // iOS qulaqlıq çıxanda pleyeri özü dayandıra bilir, ona görə "az əvvəl dayandı" da sayılır
     final st = _stoppedAt;
-    final justStopped = st != null &&
+    final justStopped =
+        st != null &&
         DateTime.now().difference(st) < const Duration(seconds: 2) &&
         !_userPaused &&
         player.processingState != ProcessingState.completed;
@@ -199,7 +201,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         profileName = pr.name;
         profileColor = pr.color;
         profileSince = DateTime.fromMillisecondsSinceEpoch(
-            pr.sinceMs > 0 ? pr.sinceMs : DateTime.now().millisecondsSinceEpoch);
+          pr.sinceMs > 0 ? pr.sinceMs : DateTime.now().millisecondsSinceEpoch,
+        );
       } else {
         profileSince = DateTime.now(); // ilk açılış: hesab indi yaradılır
         _saveProfile();
@@ -327,9 +330,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         p.playerStateStream.listen((_) {
           if (!_fading) _trackPlaying(p.playing);
           // pauza: mövqeyi dərhal saxla (mahnı yüklənərkən köhnə mövqe yazılmasın)
-          if (!_fading &&
-              !p.playing &&
-              p.processingState == ProcessingState.ready) {
+          if (!_fading && !p.playing && p.processingState == ProcessingState.ready) {
             _crossTimer?.cancel();
             _crossTimer = null;
             _savePositionNow();
@@ -337,8 +338,10 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
           notifyListeners();
           _stateCtl.add(null);
         }),
-        p.playbackEventStream.listen((_) => _stateCtl.add(null),
-            onError: (Object e) => debugPrint('Pleyer xətası: $e')),
+        p.playbackEventStream.listen(
+          (_) => _stateCtl.add(null),
+          onError: (Object e) => debugPrint('Pleyer xətası: $e'),
+        ),
         p.processingStateStream.listen((state) {
           if (state == ProcessingState.completed) _onCompleted();
         }),
@@ -352,8 +355,13 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Sözü (ya da "bulunamadı" işaretini) şarkının büyük kaydından bağımsız olarak saklar.
   void _saveLyrics(Song s) {
-    unawaited(CloudioStore.instance.saveLyrics(s.id, s.lyrics,
-        notFound: s.lyricsStatus == LyricsStatus.notFound));
+    unawaited(
+      CloudioStore.instance.saveLyrics(
+        s.id,
+        s.lyrics,
+        notFound: s.lyricsStatus == LyricsStatus.notFound,
+      ),
+    );
   }
 
   Future<bool> _saveSong(Song s, {bool withAudio = false}) {
@@ -370,9 +378,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       lyrics: s.lyrics,
       lyricsNotFound: s.lyricsStatus == LyricsStatus.notFound,
       file: s.file,
-      durationMs: s.duration != null
-          ? s.duration!.inMilliseconds
-          : (s.durationTried ? -1 : null),
+      durationMs: s.duration != null ? s.duration!.inMilliseconds : (s.durationTried ? -1 : null),
       playCount: s.playCount,
       lastPlayedMs: s.lastPlayedMs,
       gainDb: s.gainDb,
@@ -387,26 +393,31 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _savePlaylists() {
-    unawaited(CloudioStore.instance.savePlaylists([
-      for (final p in playlists)
-        SavedPlaylist(p.name, [for (final s in p.songs) s.id]),
-    ]));
+    unawaited(
+      CloudioStore.instance.savePlaylists([
+        for (final p in playlists) SavedPlaylist(p.name, [for (final s in p.songs) s.id]),
+      ]),
+    );
   }
 
   // ---- son çalma vəziyyəti (mahnı, növbə sırası, mövqe) ----
   int _lastPosSave = 0;
 
   void _saveQueueState() {
-    unawaited(CloudioStore.instance.saveQueue(SavedQueue(
-      ids: [for (final s in _queue) s.id],
-      order: List.of(_order),
-      cur: currentIndex,
-      pos: _pos,
-      shuffle: shuffleOn,
-      smart: smartShuffle,
-      repeat: repeatKind.index,
-      name: queueName,
-    )));
+    unawaited(
+      CloudioStore.instance.saveQueue(
+        SavedQueue(
+          ids: [for (final s in _queue) s.id],
+          order: List.of(_order),
+          cur: currentIndex,
+          pos: _pos,
+          shuffle: shuffleOn,
+          smart: smartShuffle,
+          repeat: repeatKind.index,
+          name: queueName,
+        ),
+      ),
+    );
   }
 
   /// Hazırkı mahnının çalma mövqeyini saxlayır. Yeni mahnı hələ yüklənməyibsə
@@ -415,8 +426,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     final s = _markSong;
     if (s == null || !identical(s, current)) return;
     _lastPosSave = DateTime.now().millisecondsSinceEpoch;
-    unawaited(CloudioStore.instance
-        .savePosition(s.id, (pos ?? player.position).inMilliseconds));
+    unawaited(CloudioStore.instance.savePosition(s.id, (pos ?? player.position).inMilliseconds));
   }
 
   @override
@@ -449,7 +459,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
           : (q.smart ? ShuffleMode.smart : ShuffleMode.normal);
       repeatKind = RepeatKind.values[q.repeat.clamp(0, 2)];
       if (shuffleOn) {
-        final okOrder = queue.length == q.ids.length &&
+        final okOrder =
+            queue.length == q.ids.length &&
             q.order.length == queue.length &&
             q.order.toSet().length == queue.length &&
             q.order.every((i) => i >= 0 && i < queue.length) &&
@@ -691,12 +702,15 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
   int _coverVersion = 0;
 
-  void _saveSettings() => unawaited(CloudioStore.instance.saveSettings(
+  void _saveSettings() => unawaited(
+    CloudioStore.instance.saveSettings(
       crossfade: crossfadeSecs,
       normalize: normalizeOn,
       coverVersion: _coverVersion,
       speed: speed,
-      dynamicBg: dynamicBg));
+      dynamicBg: dynamicBg,
+    ),
+  );
 
   // ---- crossfade / boşluksuz keçid ----
   // İkinci pleyer sıradakı mahnını əvvəlcədən yükləyir; sonda iki pleyerin səsi
@@ -716,10 +730,13 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   int profileColor = 0; // settings_page.dart-dakı kProfileColors indeksi
   DateTime profileSince = DateTime.now();
 
-  void _saveProfile() => unawaited(CloudioStore.instance.saveProfile(
+  void _saveProfile() => unawaited(
+    CloudioStore.instance.saveProfile(
       name: profileName,
       color: profileColor,
-      sinceMs: profileSince.millisecondsSinceEpoch));
+      sinceMs: profileSince.millisecondsSinceEpoch,
+    ),
+  );
 
   void setProfile({required String name, required int color}) {
     final n = name.trim();
@@ -970,15 +987,13 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     bool needsCover(Song s) =>
         kOnlineCovers &&
         s.cover == null &&
-        (s.coverStatus == CoverStatus.idle ||
-            (retryNone && s.coverStatus == CoverStatus.none));
+        (s.coverStatus == CoverStatus.idle || (retryNone && s.coverStatus == CoverStatus.none));
     bool needsLyrics(Song s) =>
         kOnlineLyrics &&
         s.lyrics == null &&
         (s.lyricsStatus == LyricsStatus.idle ||
             (retryNone &&
-                (s.lyricsStatus == LyricsStatus.notFound ||
-                    s.lyricsStatus == LyricsStatus.error)));
+                (s.lyricsStatus == LyricsStatus.notFound || s.lyricsStatus == LyricsStatus.error)));
 
     final todo = songs.where((s) => needsCover(s) || needsLyrics(s)).toList();
     if (todo.isEmpty) {
@@ -1208,8 +1223,11 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Girilen bilgilerle internette kapak arar (kaydetmez, sadece önizleme için döner).
-  Future<Uint8List?> searchCoverOnline(
-      {required String title, required String artist, required String album}) async {
+  Future<Uint8List?> searchCoverOnline({
+    required String title,
+    required String artist,
+    required String album,
+  }) async {
     final hit = await findCover(
       title: title.trim(),
       artist: artist.trim() == kUnknownArtist ? '' : artist.trim(),
@@ -1249,8 +1267,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (!kOnlineLyrics || (s.lyrics != null && !force)) return;
     if (s.lyricsStatus == LyricsStatus.loading) return;
     if (!force &&
-        (s.lyricsStatus == LyricsStatus.found ||
-            s.lyricsStatus == LyricsStatus.notFound)) {
+        (s.lyricsStatus == LyricsStatus.found || s.lyricsStatus == LyricsStatus.notFound)) {
       return;
     }
     s.lyricsStatus = LyricsStatus.loading;
@@ -1267,8 +1284,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         s.lyricsStatus = LyricsStatus.found;
       } else {
         // zorla aramada eski söz korunur
-        s.lyricsStatus =
-            s.lyrics != null ? LyricsStatus.found : LyricsStatus.notFound;
+        s.lyricsStatus = s.lyrics != null ? LyricsStatus.found : LyricsStatus.notFound;
       }
     } catch (e) {
       debugPrint('Söz aranamadı (${s.title}): $e');
@@ -1358,8 +1374,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (target == oldIndex) return;
     final s = songs.removeAt(oldIndex);
     songs.insert(target, s);
-    unawaited(CloudioStore.instance
-        .saveLibraryOrder([for (final x in songs) x.id]));
+    unawaited(CloudioStore.instance.saveLibraryOrder([for (final x in songs) x.id]));
     notifyListeners();
   }
 
@@ -1437,8 +1452,12 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         durMs: e.durMs,
       );
     }
-    await CloudioStore.instance
-        .reassignPlays(remove.id, keep.id, title: keep.title, artist: keep.artist);
+    await CloudioStore.instance.reassignPlays(
+      remove.id,
+      keep.id,
+      title: keep.title,
+      artist: keep.artist,
+    );
     await removeSong(remove); // siyahıları, növbəni və səs faylını da təmizləyir
   }
 
@@ -1472,8 +1491,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         String? localFile;
         String? localPath = kIsWeb ? null : f.path;
         if (!kIsWeb && f.path != null) {
-          localFile = await importAudioFile(
-              sourcePath: f.path!, fileName: '$seq.$ext');
+          localFile = await importAudioFile(sourcePath: f.path!, fileName: '$seq.$ext');
           if (localFile != null) localPath = audioPathFor(localFile);
         }
 
@@ -1483,33 +1501,32 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         final dur = readDuration(bytes, ext);
         final gain = readReplayGain(bytes, ext);
 
-        final song = Song(
-          id: id,
-          seq: seq,
-          title: tags.title.isNotEmpty ? tags.title : nameTitle,
-          artist: tags.artist.isNotEmpty
-              ? tags.artist
-              : (nameArtist.isNotEmpty ? nameArtist : kUnknownArtist),
-          album: tags.album,
-          lyrics: tags.lyrics.isEmpty
-              ? null
-              : Lyrics.parse(tags.lyrics, source: 'Dosya'),
-          cover: cover,
-          tint: tint,
-          ext: ext,
-          path: localPath,
-          file: localFile,
-          bytes: kIsWeb ? bytes : null,
-          duration: dur,
-        )
-          ..durationTried = true
-          ..gainDb = gain
-          ..gainTried = true
-          ..genre = tags.genre
-          ..year = tags.year
-          ..trackNo = tags.track
-          ..discNo = tags.disc
-          ..tagsTried = true;
+        final song =
+            Song(
+                id: id,
+                seq: seq,
+                title: tags.title.isNotEmpty ? tags.title : nameTitle,
+                artist: tags.artist.isNotEmpty
+                    ? tags.artist
+                    : (nameArtist.isNotEmpty ? nameArtist : kUnknownArtist),
+                album: tags.album,
+                lyrics: tags.lyrics.isEmpty ? null : Lyrics.parse(tags.lyrics, source: 'Dosya'),
+                cover: cover,
+                tint: tint,
+                ext: ext,
+                path: localPath,
+                file: localFile,
+                bytes: kIsWeb ? bytes : null,
+                duration: dur,
+              )
+              ..durationTried = true
+              ..gainDb = gain
+              ..gainTried = true
+              ..genre = tags.genre
+              ..year = tags.year
+              ..trackNo = tags.track
+              ..discNo = tags.disc
+              ..tagsTried = true;
         songs.add(song);
         final saved = await _saveSong(song, withAudio: true);
         // Baza yazdısa səs faylını yaddaşda saxlamırıq: çalanda bazadan oxunacaq
@@ -1530,8 +1547,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   bool get backupSupported => !kIsWeb && CloudioStore.instance.enabled;
 
   /// Ses dosyası telefonda bulunmayan şarkı sayısı (hafif yedekten sonra olur).
-  int get missingAudioCount =>
-      kIsWeb ? 0 : songs.where((s) => s.path == null).length;
+  int get missingAudioCount => kIsWeb ? 0 : songs.where((s) => s.path == null).length;
 
   /// Yedek almadan önce iki türün boyutunu hesaplar (ekranda gösterilir).
   /// Veritabanı: şarkı bilgileri, kapaklar, sözler, janr/yıl/sıra, listeler, beğeniler,
@@ -1562,15 +1578,14 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     BackupPlan plan, {
     required bool full,
     void Function(double progress)? onProgress,
-  }) =>
-      writeBackupFile(
-        dbJson: plan.dbJson,
-        full: full,
-        songCount: plan.songCount,
-        playlistCount: plan.playlistCount,
-        appVersion: kAppVersion,
-        onProgress: onProgress,
-      );
+  }) => writeBackupFile(
+    dbJson: plan.dbJson,
+    full: full,
+    songCount: plan.songCount,
+    playlistCount: plan.playlistCount,
+    appVersion: kAppVersion,
+    onProgress: onProgress,
+  );
 
   /// Yedek dosyasının başlığını okur (hiçbir şeyi değiştirmez). Geçersizse [BackupException].
   Future<BackupManifest> inspectBackup(String path) => readBackupManifest(path);
@@ -1584,8 +1599,10 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     var wiped = false; // bellekteki kitaplık boşaltıldı, eskisi yeniden yüklenmeli olabilir
     try {
       onProgress?.call(0, 'Yedek açılıyor');
-      final staged = await extractBackup(path,
-          onProgress: (p) => onProgress?.call(p * 0.9, 'Yedek açılıyor'));
+      final staged = await extractBackup(
+        path,
+        onProgress: (p) => onProgress?.call(p * 0.9, 'Yedek açılıyor'),
+      );
 
       onProgress?.call(0.92, 'Eski kitaplık değiştiriliyor');
       await _resetLibraryState();
@@ -1594,8 +1611,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       final ok = await CloudioStore.instance.replaceAll(staged.db);
       if (!ok) {
         await swap.rollback();
-        throw const BackupException(
-            'Veritabanı geri yüklenemedi. Eski kitaplığın korundu.');
+        throw const BackupException('Veritabanı geri yüklenemedi. Eski kitaplığın korundu.');
       }
       await swap.commit();
 
@@ -1660,8 +1676,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
         if (target == null) continue;
         final dot = f.name.lastIndexOf('.');
         final fileExt = dot > 0 ? f.name.substring(dot + 1).toLowerCase() : '';
-        final local = target.file ??
-            '${target.seq}.${target.ext.isEmpty ? fileExt : target.ext}';
+        final local = target.file ?? '${target.seq}.${target.ext.isEmpty ? fileExt : target.ext}';
         final stored = await importAudioFile(sourcePath: p, fileName: local);
         if (stored == null) continue;
         final newPath = audioPathFor(stored);
@@ -1706,8 +1721,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
   int _playToken = 0; // art arda gelen sonraki/önceki isteklerinde eskisini iptal eder
 
-  Future<void> _playIndex(int index,
-      {bool autoPlay = true, Duration? startAt}) async {
+  Future<void> _playIndex(int index, {bool autoPlay = true, Duration? startAt}) async {
     currentIndex = index;
     final s = _queue[index];
     _saveQueueState();
@@ -1729,8 +1743,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
           debugPrint('Səs faylı bazada tapılmadı: ${s.title}');
           return;
         }
-        loadedDur =
-            await player.setBytes(data, name: s.id, initialPosition: startAt);
+        loadedDur = await player.setBytes(data, name: s.id, initialPosition: startAt);
       } else {
         final path = s.path;
         if (path == null) {
@@ -1785,8 +1798,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     _savePositionNow(position);
   }
 
-  void toggleShuffle() =>
-      setShuffleMode(shuffleOn ? ShuffleMode.off : ShuffleMode.normal);
+  void toggleShuffle() => setShuffleMode(shuffleOn ? ShuffleMode.off : ShuffleMode.normal);
 
   /// Qarışıq rejimini seçir (Spotify kimi: Qarışıq / Ağıllı mix / söndür).
   void setShuffleMode(ShuffleMode m) {

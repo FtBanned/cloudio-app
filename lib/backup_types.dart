@@ -72,16 +72,16 @@ class BackupManifest {
   DateTime get created => DateTime.fromMillisecondsSinceEpoch(createdMs);
 
   Map<String, Object?> toJson() => {
-        'format': format,
-        'full': full,
-        'created': createdMs,
-        'app': appVersion,
-        'songs': songCount,
-        'playlists': playlistCount,
-        'dbBytes': dbBytes,
-        'audioBytes': audioBytes,
-        'audio': [for (final a in audio) a.toJson()],
-      };
+    'format': format,
+    'full': full,
+    'created': createdMs,
+    'app': appVersion,
+    'songs': songCount,
+    'playlists': playlistCount,
+    'dbBytes': dbBytes,
+    'audioBytes': audioBytes,
+    'audio': [for (final a in audio) a.toJson()],
+  };
 
   static BackupManifest fromJson(Object? raw) {
     if (raw is! Map) throw const BackupException('Yedek dosyası bozuk');
@@ -89,7 +89,8 @@ class BackupManifest {
       final format = raw['format'] as int;
       if (format > kBackupFormat) {
         throw const BackupException(
-            'Bu yedek Cloudio\'nun daha yeni bir sürümüyle alınmış. Uygulamayı güncelle.');
+          'Bu yedek Cloudio\'nun daha yeni bir sürümüyle alınmış. Uygulamayı güncelle.',
+        );
       }
       return BackupManifest(
         format: format,
@@ -100,10 +101,7 @@ class BackupManifest {
         playlistCount: raw['playlists'] as int? ?? 0,
         dbBytes: raw['dbBytes'] as int? ?? 0,
         audioBytes: raw['audioBytes'] as int? ?? 0,
-        audio: [
-          for (final e in (raw['audio'] as List? ?? const []))
-            BackupAudioEntry.fromJson(e),
-        ],
+        audio: [for (final e in (raw['audio'] as List? ?? const [])) BackupAudioEntry.fromJson(e)],
       );
     } on BackupException {
       rethrow;

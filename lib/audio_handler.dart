@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
+import 'package:flutter/widgets.dart'
+    show AppLifecycleState, WidgetsBinding, WidgetsBindingObserver;
 import 'package:just_audio/just_audio.dart' show ProcessingState;
 
 import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
@@ -50,12 +51,12 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
 
   // ---- vəziyyəti sistemə bildir ----
   AudioProcessingState _map(ProcessingState s) => switch (s) {
-        ProcessingState.idle => AudioProcessingState.idle,
-        ProcessingState.loading => AudioProcessingState.loading,
-        ProcessingState.buffering => AudioProcessingState.buffering,
-        ProcessingState.ready => AudioProcessingState.ready,
-        ProcessingState.completed => AudioProcessingState.completed,
-      };
+    ProcessingState.idle => AudioProcessingState.idle,
+    ProcessingState.loading => AudioProcessingState.loading,
+    ProcessingState.buffering => AudioProcessingState.buffering,
+    ProcessingState.ready => AudioProcessingState.ready,
+    ProcessingState.completed => AudioProcessingState.completed,
+  };
 
   // ---- kontroller kaybolursa kendini toparla ----
   // iOS, bir süre sonra (kesinti, başka uygulamanın sesi, ses oturumu değişimi) Now Playing
@@ -90,8 +91,7 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
     // çalma başlayandan az sonra (cihaz tam qalxandan sonra) iki dəfə, sonra hər 10 saniyə
     Future<void>.delayed(const Duration(milliseconds: 1500), _fixSession);
     Future<void>.delayed(const Duration(seconds: 5), _fixSession);
-    _keepAlive ??=
-        Timer.periodic(const Duration(seconds: 10), (_) => _fixSession());
+    _keepAlive ??= Timer.periodic(const Duration(seconds: 10), (_) => _fixSession());
   }
 
   void _stopKeepAlive() {
@@ -130,17 +130,18 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
       if (p.playing) MediaControl.pause else MediaControl.play,
       if (_c.hasNext) MediaControl.skipToNext,
     ];
-    playbackState.add(PlaybackState(
-      controls: controls,
-      systemActions: const {MediaAction.seek},
-      androidCompactActionIndices:
-          List<int>.generate(controls.length, (i) => i),
-      processingState: _map(p.processingState),
-      playing: p.playing,
-      updatePosition: p.position,
-      bufferedPosition: p.bufferedPosition,
-      speed: p.speed,
-    ));
+    playbackState.add(
+      PlaybackState(
+        controls: controls,
+        systemActions: const {MediaAction.seek},
+        androidCompactActionIndices: List<int>.generate(controls.length, (i) => i),
+        processingState: _map(p.processingState),
+        playing: p.playing,
+        updatePosition: p.position,
+        bufferedPosition: p.bufferedPosition,
+        speed: p.speed,
+      ),
+    );
   }
 
   // ---- mahnı məlumatı (ad, sənətçi, albom, kapak) ----
@@ -189,13 +190,15 @@ class CloudioAudioHandler extends BaseAudioHandler with WidgetsBindingObserver {
       art = await writeCoverFile('${s.seq}_${cover.length}', cover);
     }
     if (!identical(_c.current, s)) return; // bu arada başqa mahnıya keçilib
-    mediaItem.add(MediaItem(
-      id: s.id,
-      title: s.title,
-      artist: s.artist == kUnknownArtist ? null : s.artist,
-      album: s.album.isEmpty ? null : s.album,
-      duration: _c.player.duration,
-      artUri: art,
-    ));
+    mediaItem.add(
+      MediaItem(
+        id: s.id,
+        title: s.title,
+        artist: s.artist == kUnknownArtist ? null : s.artist,
+        album: s.album.isEmpty ? null : s.album,
+        duration: _c.player.duration,
+        artUri: art,
+      ),
+    );
   }
 }

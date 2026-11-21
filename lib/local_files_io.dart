@@ -25,10 +25,7 @@ String? audioPathFor(String? file) {
 }
 
 /// Seçilmiş (müvəqqəti) faylı tətbiqin qovluğuna köçürür. Uğurlu olarsa fayl adını qaytarır.
-Future<String?> importAudioFile({
-  required String sourcePath,
-  required String fileName,
-}) async {
+Future<String?> importAudioFile({required String sourcePath, required String fileName}) async {
   try {
     if (_audioDir == null) await initLocalFiles();
     await File(sourcePath).copy('${_audioDir!.path}/$fileName');

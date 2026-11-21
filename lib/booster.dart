@@ -41,8 +41,7 @@ class Booster extends ChangeNotifier {
   Timer? _ramp;
 
   /// 20*log10(mult) + əlavə. Kompressorun makeup tavanı +40 dB.
-  double get targetDb =>
-      (20 * math.log(mult) / math.ln10 + extraDb).clamp(0.0, 40.0).toDouble();
+  double get targetDb => (20 * math.log(mult) / math.ln10 + extraDb).clamp(0.0, 40.0).toDouble();
 
   bool get engineReady => SoloudEngine.instance.ready;
 
@@ -60,10 +59,10 @@ class Booster extends ChangeNotifier {
       extraDb = ((m['extra'] as num?)?.toDouble() ?? 0).clamp(0.0, 12.0).toDouble();
       ratio = ((m['ratio'] as num?)?.toDouble() ?? ratio).clamp(1.0, 8.0).toDouble();
       threshold = ((m['thr'] as num?)?.toDouble() ?? threshold).clamp(-60.0, 0.0).toDouble();
-      limThreshold =
-          ((m['limThr'] as num?)?.toDouble() ?? limThreshold).clamp(-24.0, 0.0).toDouble();
-      limCeiling =
-          ((m['limCeil'] as num?)?.toDouble() ?? limCeiling).clamp(-12.0, 0.0).toDouble();
+      limThreshold = ((m['limThr'] as num?)?.toDouble() ?? limThreshold)
+          .clamp(-24.0, 0.0)
+          .toDouble();
+      limCeiling = ((m['limCeil'] as num?)?.toDouble() ?? limCeiling).clamp(-12.0, 0.0).toDouble();
       final b = m['bands'];
       if (b is List && b.length == kBands) {
         for (var i = 0; i < kBands; i++) {
@@ -83,17 +82,19 @@ class Booster extends ChangeNotifier {
   }
 
   void _save() {
-    unawaited(CloudioStore.instance.saveBooster(<String, Object?>{
-      'on': enabled,
-      'mult': mult,
-      'clarity': clarity,
-      'extra': extraDb,
-      'ratio': ratio,
-      'thr': threshold,
-      'limThr': limThreshold,
-      'limCeil': limCeiling,
-      'bands': List<double>.of(bandGain),
-    }));
+    unawaited(
+      CloudioStore.instance.saveBooster(<String, Object?>{
+        'on': enabled,
+        'mult': mult,
+        'clarity': clarity,
+        'extra': extraDb,
+        'ratio': ratio,
+        'thr': threshold,
+        'limThr': limThreshold,
+        'limCeil': limCeiling,
+        'bands': List<double>.of(bandGain),
+      }),
+    );
   }
 
   // ---- təhlükə qiyməti ----

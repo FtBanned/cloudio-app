@@ -5,9 +5,7 @@ import 'player_controller.dart';
 
 /// Tam ekran oynatıcıdakı "Sıra" düyməsi bunu açır.
 void openQueue(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const QueuePage()),
-  );
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const QueuePage()));
 }
 
 /// Sıra: hazırda çalan mahnı + ardınca nə çalacaq.
@@ -53,19 +51,23 @@ class _QueuePageState extends State<QueuePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Sıra',
-                                style: TextStyle(
-                                    fontSize: 22, fontWeight: FontWeight.bold)),
-                            Text('Çalan: ${c.queueName}',
+                            const Text(
+                              'Sıra',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'Çalan: ${c.queueName}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: kText60),
+                            ),
+                            if (next.isNotEmpty)
+                              Text(
+                                'Sırada: ${countAndTotal(next)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: kText60)),
-                            if (next.isNotEmpty)
-                              Text('Sırada: ${countAndTotal(next)}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: kText38, fontSize: 12)),
+                                style: TextStyle(color: kText38, fontSize: 12),
+                              ),
                           ],
                         ),
                       ),
@@ -82,20 +84,22 @@ class _QueuePageState extends State<QueuePage> {
                 if (cur != null)
                   ListTile(
                     leading: Cover(size: 48, bytes: cur.cover),
-                    title: Text(cur.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: kGreen, fontWeight: FontWeight.bold)),
-                    subtitle: Text(cur.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: kText60)),
+                    title: Text(
+                      cur.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: kGreen, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      cur.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: kText60),
+                    ),
                     trailing: Container(
                       width: 44,
                       height: 44,
-                      decoration: BoxDecoration(
-                          color: kText, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: kText, shape: BoxShape.circle),
                       child: IconButton(
                         color: kBg,
                         icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow),
@@ -106,8 +110,7 @@ class _QueuePageState extends State<QueuePage> {
                 Expanded(
                   child: next.isEmpty
                       ? Center(
-                          child: Text('Sırada başka şarkı yok',
-                              style: TextStyle(color: kText60)),
+                          child: Text('Sırada başka şarkı yok', style: TextStyle(color: kText60)),
                         )
                       : ReorderableListView.builder(
                           buildDefaultDragHandles: false,
@@ -119,24 +122,25 @@ class _QueuePageState extends State<QueuePage> {
                             return ListTile(
                               key: ValueKey(s.id),
                               leading: Cover(size: 48, bytes: s.cover),
-                              title: Text(s.title,
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text(s.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: kText60)),
+                              title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text(
+                                s.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: kText60),
+                              ),
                               onTap: _edit ? null : () => c.playUpNext(i),
                               trailing: _edit
                                   ? IconButton(
                                       icon: const Icon(
-                                          Icons.remove_circle_outline,
-                                          color: Colors.redAccent),
+                                        Icons.remove_circle_outline,
+                                        color: Colors.redAccent,
+                                      ),
                                       onPressed: () => c.removeFromUpNext(i),
                                     )
                                   : ReorderableDragStartListener(
                                       index: i,
-                                      child: Icon(Icons.drag_handle,
-                                          color: kText70),
+                                      child: Icon(Icons.drag_handle, color: kText70),
                                     ),
                             );
                           },
@@ -157,9 +161,7 @@ class _QueuePageState extends State<QueuePage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _QueueButton(
-                          icon: c.repeatKind == RepeatKind.one
-                              ? Icons.repeat_one
-                              : Icons.repeat,
+                          icon: c.repeatKind == RepeatKind.one ? Icons.repeat_one : Icons.repeat,
                           label: repeatLabel,
                           active: c.repeatKind != RepeatKind.off,
                           onTap: c.cycleRepeat,

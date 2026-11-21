@@ -21,10 +21,7 @@ class Lyrics {
 
   /// LRC ya da düz metni çözer. İçinde [dd:ss.xx] varsa senkron, yoksa düz söz olur.
   static Lyrics? parse(String raw, {String source = 'Dosya'}) {
-    final text = raw
-        .replaceAll('﻿', '')
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n');
+    final text = raw.replaceAll('﻿', '').replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
     var offsetMs = 0;
     final timed = <({int ms, int order, String text})>[];
@@ -44,8 +41,7 @@ class Lyrics {
         plain.add(line.trim());
         continue;
       }
-      final body =
-          line.substring(matches.last.end).replaceAll(_wordTs, '').trim();
+      final body = line.substring(matches.last.end).replaceAll(_wordTs, '').trim();
       for (final m in matches) {
         final min = int.parse(m.group(1)!);
         final sec = int.parse(m.group(2)!);
@@ -53,7 +49,13 @@ class Lyrics {
         var ms = min * 60000 + sec * 1000;
         if (frac != null) {
           // 1 hane = onda bir, 2 hane = yüzde bir, 3 hane = milisaniye
-          ms += int.parse(frac) * (frac.length == 1 ? 100 : frac.length == 2 ? 10 : 1);
+          ms +=
+              int.parse(frac) *
+              (frac.length == 1
+                  ? 100
+                  : frac.length == 2
+                  ? 10
+                  : 1);
         }
         timed.add((ms: ms, order: timed.length, text: body));
       }
@@ -68,9 +70,7 @@ class Lyrics {
       return Lyrics(
         [
           for (final t in timed)
-            LyricLine(
-                Duration(milliseconds: (t.ms - offsetMs).clamp(0, 1 << 31).toInt()),
-                t.text),
+            LyricLine(Duration(milliseconds: (t.ms - offsetMs).clamp(0, 1 << 31).toInt()), t.text),
         ],
         synced: true,
         source: source,
@@ -120,14 +120,20 @@ String cleanForSearch(String s) => s
     .replaceAll('_', ' ')
     .replaceAll(RegExp(r'[\(\[\{][^\)\]\}]*[\)\]\}]'), ' ')
     .replaceAll(
-        RegExp(r'(?:https?://)?(?:www\.)?[\w-]+\.(?:com|net|org|az|ru|tr|info|biz|me|tv|fm|co|io|ws|ir)\b',
-            caseSensitive: false),
-        ' ')
+      RegExp(
+        r'(?:https?://)?(?:www\.)?[\w-]+\.(?:com|net|org|az|ru|tr|info|biz|me|tv|fm|co|io|ws|ir)\b',
+        caseSensitive: false,
+      ),
+      ' ',
+    )
     .replaceFirst(RegExp(r'^\s*\d{1,3}\s*[\.\-–)]\s+'), '')
     .replaceAll(
-        RegExp(r'\b(official|video|music|lyrics?|lyric|audio|hd|hq|4k|klip|sözleri|şarkı sözleri|mp3|indir|download|yukle)\b',
-            caseSensitive: false),
-        ' ')
+      RegExp(
+        r'\b(official|video|music|lyrics?|lyric|audio|hd|hq|4k|klip|sözleri|şarkı sözleri|mp3|indir|download|yukle)\b',
+        caseSensitive: false,
+      ),
+      ' ',
+    )
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
 
@@ -174,8 +180,7 @@ Future<Lyrics?> fetchLyricsOnline({
       anySuccess = true;
       final list = jsonDecode(utf8.decode(res.bodyBytes));
       if (list is! List) continue;
-      final best = _pickBest(
-          isExtra ? _filterByTokens(list, qTokens) : list, duration);
+      final best = _pickBest(isExtra ? _filterByTokens(list, qTokens) : list, duration);
       if (best != null) return best;
     } catch (e) {
       lastError = e;
@@ -217,19 +222,18 @@ Future<List<LyricsCandidate>> searchLyricsCandidates(String query) async {
     if (item['instrumental'] == true) continue;
     final synced = (item['syncedLyrics'] as String?)?.trim() ?? '';
     final plain = (item['plainLyrics'] as String?)?.trim() ?? '';
-    final parsed =
-        Lyrics.parse(synced.isNotEmpty ? synced : plain, source: 'LRCLIB');
+    final parsed = Lyrics.parse(synced.isNotEmpty ? synced : plain, source: 'LRCLIB');
     if (parsed == null) continue;
     final d = item['duration'];
-    out.add(LyricsCandidate(
-      title: (item['trackName'] as String?) ?? (item['name'] as String?) ?? '',
-      artist: (item['artistName'] as String?) ?? '',
-      album: (item['albumName'] as String?) ?? '',
-      duration: (d is num && d > 0)
-          ? Duration(milliseconds: (d * 1000).round())
-          : null,
-      lyrics: parsed,
-    ));
+    out.add(
+      LyricsCandidate(
+        title: (item['trackName'] as String?) ?? (item['name'] as String?) ?? '',
+        artist: (item['artistName'] as String?) ?? '',
+        album: (item['albumName'] as String?) ?? '',
+        duration: (d is num && d > 0) ? Duration(milliseconds: (d * 1000).round()) : null,
+        lyrics: parsed,
+      ),
+    );
     if (out.length >= 30) break;
   }
   return out;
@@ -237,9 +241,24 @@ Future<List<LyricsCandidate>> searchLyricsCandidates(String query) async {
 
 String _lyNorm(String s) {
   const tr = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-    'ə': 'e', 'Ə': 'e', 'Ç': 'c', 'Ğ': 'g', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
-    'â': 'a', 'î': 'i', 'û': 'u', 'é': 'e',
+    'ç': 'c',
+    'ğ': 'g',
+    'ı': 'i',
+    'İ': 'i',
+    'ö': 'o',
+    'ş': 's',
+    'ü': 'u',
+    'ə': 'e',
+    'Ə': 'e',
+    'Ç': 'c',
+    'Ğ': 'g',
+    'Ö': 'o',
+    'Ş': 's',
+    'Ü': 'u',
+    'â': 'a',
+    'î': 'i',
+    'û': 'u',
+    'é': 'e',
   };
   final b = StringBuffer();
   for (final r in s.runes) {
@@ -254,8 +273,10 @@ String _lyNorm(String s) {
       .trim();
 }
 
-List<String> _lyTokens(String s) =>
-    [for (final t in _lyNorm(s).split(' ')) if (t.isNotEmpty) t];
+List<String> _lyTokens(String s) => [
+  for (final t in _lyNorm(s).split(' '))
+    if (t.isNotEmpty) t,
+];
 
 /// LRCLIB sonuçlarından, adı+sanatçısı girişle sözcük bazında örtüşenleri bırakır.
 List _filterByTokens(List list, List<String> qTok) {

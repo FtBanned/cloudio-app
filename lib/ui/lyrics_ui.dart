@@ -4,17 +4,14 @@ part of '../main.dart';
 Color lyricsBg(Color? tint) {
   if (tint == null) return const Color(0xFF6C63B8);
   final h = HSLColor.fromColor(tint);
-  return h
-      .withLightness(0.34)
-      .withSaturation(h.saturation.clamp(0.25, 0.7).toDouble())
-      .toColor();
+  return h.withLightness(0.34).withSaturation(h.saturation.clamp(0.25, 0.7).toDouble()).toColor();
 }
 
 /// Serbest metinlə internette söz axtarır, siyahıdan seçilən sözü mahnıya bağlayır.
 Future<void> showLyricsSearch(BuildContext context, Song song) async {
-  final initial = cleanForSearch(song.artist == kUnknownArtist
-      ? song.title
-      : '${song.artist} ${song.title}');
+  final initial = cleanForSearch(
+    song.artist == kUnknownArtist ? song.title : '${song.artist} ${song.title}',
+  );
   final picked = await showModalBottomSheet<LyricsCandidate>(
     context: context,
     backgroundColor: kCard,
@@ -26,8 +23,7 @@ Future<void> showLyricsSearch(BuildContext context, Song song) async {
   // Söz, sayfa kapanmış olsa bile mutlaka kaydedilir; sadece bildirim context ister
   PlayerController.instance.setLyrics(song, picked.lyrics);
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context)
-      .showSnackBar(const SnackBar(content: Text('Şarkı sözü eklendi')));
+  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şarkı sözü eklendi')));
 }
 
 class _LyricsSearchSheet extends StatefulWidget {
@@ -104,9 +100,10 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
               padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Şarkı sözü ara',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Şarkı sözü ara',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             Padding(
@@ -114,8 +111,9 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                    'Bir sonuca dokun: sözü bu şarkıya eklenir. Aranan metin lrclib.net\'e gönderilir.',
-                    style: TextStyle(color: kText54, fontSize: 12)),
+                  'Bir sonuca dokun: sözü bu şarkıya eklenir. Aranan metin lrclib.net\'e gönderilir.',
+                  style: TextStyle(color: kText54, fontSize: 12),
+                ),
               ),
             ),
             Padding(
@@ -126,10 +124,7 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
                 onSubmitted: (_) => _search(),
                 decoration: InputDecoration(
                   hintText: 'Sanatçı ve şarkı adı veya bir söz satırı',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _search,
-                  ),
+                  suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
                 ),
               ),
             ),
@@ -137,40 +132,37 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
               child: _loading
                   ? Center(child: CircularProgressIndicator(color: kGreen))
                   : _error != null
-                      ? Center(
-                          child: Text(_error!,
-                              style: TextStyle(color: kText60)))
-                      : (_searched && _results.isEmpty)
-                          ? Center(
-                              child: Text('Sonuç yok, aramayı değiştir',
-                                  style: TextStyle(color: kText60)))
-                          : ListView.builder(
-                              itemCount: _results.length,
-                              itemBuilder: (_, i) {
-                                final r = _results[i];
-                                final info = [
-                                  if (r.artist.isNotEmpty) r.artist,
-                                  if (r.album.isNotEmpty) r.album,
-                                  if (r.duration != null)
-                                    formatDuration(r.duration!),
-                                  r.lyrics.synced ? 'Senkron' : 'Düz metin',
-                                ].join(' • ');
-                                final first = _firstLine(r.lyrics);
-                                return ListTile(
-                                  isThreeLine: first.isNotEmpty,
-                                  title: Text(r.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                  subtitle: Text(
-                                      first.isEmpty ? info : '$info\n$first',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          color: kText60)),
-                                  onTap: () => Navigator.pop(context, r),
-                                );
-                              },
-                            ),
+                  ? Center(
+                      child: Text(_error!, style: TextStyle(color: kText60)),
+                    )
+                  : (_searched && _results.isEmpty)
+                  ? Center(
+                      child: Text('Sonuç yok, aramayı değiştir', style: TextStyle(color: kText60)),
+                    )
+                  : ListView.builder(
+                      itemCount: _results.length,
+                      itemBuilder: (_, i) {
+                        final r = _results[i];
+                        final info = [
+                          if (r.artist.isNotEmpty) r.artist,
+                          if (r.album.isNotEmpty) r.album,
+                          if (r.duration != null) formatDuration(r.duration!),
+                          r.lyrics.synced ? 'Senkron' : 'Düz metin',
+                        ].join(' • ');
+                        final first = _firstLine(r.lyrics);
+                        return ListTile(
+                          isThreeLine: first.isNotEmpty,
+                          title: Text(r.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(
+                            first.isEmpty ? info : '$info\n$first',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: kText60),
+                          ),
+                          onTap: () => Navigator.pop(context, r),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -182,16 +174,14 @@ class _LyricsSearchSheetState extends State<_LyricsSearchSheet> {
 Future<void> pickLyricsFor(BuildContext context, Song song) async {
   final ok = await PlayerController.instance.importLyricsFile(song);
   if (ok == null || !context.mounted) return; // vazgeçildi
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(ok ? 'Şarkı sözü eklendi' : 'Dosyada söz bulunamadı'),
-  ));
+  ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(ok ? 'Şarkı sözü eklendi' : 'Dosyada söz bulunamadı')));
 }
 
 void openLyricsPage(BuildContext context) {
-  Navigator.of(context).push(MaterialPageRoute(
-    fullscreenDialog: true,
-    builder: (_) => const DarkZone(child: LyricsPage()),
-  ));
+  Navigator.of(context).push(
+    MaterialPageRoute(fullscreenDialog: true, builder: (_) => const DarkZone(child: LyricsPage())),
+  );
 }
 
 /// Tam ekran oynatıcının altındaki renkli "Şarkı sözleri" kartı.
@@ -240,9 +230,10 @@ class _LyricsCardState extends State<LyricsCard> {
             child: Row(
               children: [
                 const Expanded(
-                  child: Text('Şarkı sözleri',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Şarkı sözleri',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.more_horiz),
@@ -482,9 +473,11 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
     if (jump) {
       _scroll.jumpTo(target);
     } else {
-      _scroll.animateTo(target,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic);
+      _scroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -517,9 +510,7 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
                     fontSize: widget.big ? 28 : 22,
                     fontWeight: FontWeight.w800,
                     height: 1.2,
-                    color: i == _idx
-                        ? Colors.white
-                        : (i < _idx ? Colors.white38 : Colors.white54),
+                    color: i == _idx ? Colors.white : (i < _idx ? Colors.white38 : Colors.white54),
                   ),
                   child: Text(lines[i].text.isEmpty ? '♪' : lines[i].text),
                 ),
@@ -559,16 +550,18 @@ class LyricsPage extends StatelessWidget {
                       Expanded(
                         child: Column(
                           children: [
-                            Text(song.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
-                            Text(song.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 12, color: Colors.white70)),
+                            Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              song.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, color: Colors.white70),
+                            ),
                           ],
                         ),
                       ),
@@ -592,13 +585,11 @@ class LyricsPage extends StatelessWidget {
                     ),
                   ),
                   if (song.lyrics != null)
-                    Text('Sözler: ${song.lyrics!.source}',
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.white60)),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    child: SeekBar(),
-                  ),
+                    Text(
+                      'Sözler: ${song.lyrics!.source}',
+                      style: const TextStyle(fontSize: 11, color: Colors.white60),
+                    ),
+                  const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: SeekBar()),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -612,12 +603,13 @@ class LyricsPage extends StatelessWidget {
                         width: 64,
                         height: 64,
                         decoration: const BoxDecoration(
-                            color: Colors.white, shape: BoxShape.circle),
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
                         child: IconButton(
                           iconSize: 36,
                           color: Colors.black,
-                          icon: Icon(
-                              c.isPlaying ? Icons.pause : Icons.play_arrow),
+                          icon: Icon(c.isPlaying ? Icons.pause : Icons.play_arrow),
                           onPressed: c.togglePlay,
                         ),
                       ),

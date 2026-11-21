@@ -21,9 +21,7 @@ class _HomePageState extends State<HomePage> {
         final songs = c.songs;
         final recent = _musicOnly ? const <Song>[] : c.recentSongs;
         final top = _musicOnly ? const <Song>[] : c.topSongs;
-        final count = _musicOnly
-            ? songs.length
-            : (songs.length < 6 ? songs.length : 6);
+        final count = _musicOnly ? songs.length : (songs.length < 6 ? songs.length : 6);
 
         // Başlıq hissəsi; mahnılar ListView.builder ilə tənbəl (lazy) qurulur
         final header = <Widget>[
@@ -54,11 +52,12 @@ class _HomePageState extends State<HomePage> {
                 color: kCard,
                 borderRadius: BorderRadius.circular(12),
                 child: ListTile(
-                  leading: const Icon(Icons.warning_amber_rounded,
-                      color: Colors.orangeAccent),
+                  leading: const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent),
                   title: Text('${c.missingAudioCount} şarkının ses dosyası yok'),
-                  subtitle: Text('Dosyaları seçip yeniden bağla',
-                      style: TextStyle(color: kText60, fontSize: 12)),
+                  subtitle: Text(
+                    'Dosyaları seçip yeniden bağla',
+                    style: TextStyle(color: kText60, fontSize: 12),
+                  ),
                   trailing: Icon(Icons.chevron_right, color: kText38),
                   onTap: () => openBackupPage(context),
                 ),
@@ -66,15 +65,15 @@ class _HomePageState extends State<HomePage> {
             ),
           const BackupReminderBanner(),
           if (!_musicOnly) const ThrowbackCard(),
-          if (recent.isNotEmpty)
-            _SongShelf(title: 'Son çaldıkların', songs: recent),
+          if (recent.isNotEmpty) _SongShelf(title: 'Son çaldıkların', songs: recent),
           if (top.isNotEmpty)
             _SongShelf(title: 'En çok dinlediklerin', songs: top, showCount: true),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(_musicOnly ? 'Tüm şarkılar' : 'Dinlemeye başla',
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            child: Text(
+              _musicOnly ? 'Tüm şarkılar' : 'Dinlemeye başla',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
           ),
           if (songs.isEmpty)
             Padding(
@@ -102,8 +101,7 @@ class _HomePageState extends State<HomePage> {
         ];
 
         return ListView.builder(
-          padding: EdgeInsets.only(
-              bottom: 16 + MediaQuery.of(context).padding.bottom),
+          padding: EdgeInsets.only(bottom: 16 + MediaQuery.of(context).padding.bottom),
           itemCount: header.length + count,
           itemBuilder: (context, i) {
             if (i < header.length) return header[i];
@@ -121,8 +119,7 @@ class _SongShelf extends StatelessWidget {
   final String title;
   final List<Song> songs;
   final bool showCount; // true: sanatçı yerine "N kez" yaz
-  const _SongShelf(
-      {required this.title, required this.songs, this.showCount = false});
+  const _SongShelf({required this.title, required this.songs, this.showCount = false});
 
   @override
   Widget build(BuildContext context) {
@@ -132,8 +129,7 @@ class _SongShelf extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(title,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          child: Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         ),
         SizedBox(
           height: 212,
@@ -154,22 +150,23 @@ class _SongShelf extends StatelessWidget {
                     children: [
                       Cover(size: 140, bytes: s.cover),
                       const SizedBox(height: 8),
-                      Text(s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: playing ? kGreen : kText)),
+                      Text(
+                        s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: playing ? kGreen : kText,
+                        ),
+                      ),
                       const SizedBox(height: 2),
                       Text(
-                          showCount
-                              ? '${s.playCount} kez çalındı'
-                              : s.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12, color: kText60)),
+                        showCount ? '${s.playCount} kez çalındı' : s.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: kText60),
+                      ),
                     ],
                   ),
                 ),

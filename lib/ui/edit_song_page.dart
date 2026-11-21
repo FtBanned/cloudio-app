@@ -2,10 +2,8 @@ part of '../main.dart';
 
 // ================= Şarkı bilgisini düzenleme =================
 void openEditSong(BuildContext context, Song song) {
-  Navigator.of(context).push(MaterialPageRoute(
-    fullscreenDialog: true,
-    builder: (_) => EditSongPage(song: song),
-  ));
+  Navigator.of(context)
+      .push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => EditSongPage(song: song)));
 }
 
 class EditSongPage extends StatefulWidget {
@@ -32,8 +30,7 @@ class _EditSongPageState extends State<EditSongPage> {
     super.initState();
     final s = widget.song;
     _title = TextEditingController(text: s.title);
-    _artist = TextEditingController(
-        text: s.artist == kUnknownArtist ? '' : s.artist);
+    _artist = TextEditingController(text: s.artist == kUnknownArtist ? '' : s.artist);
     _album = TextEditingController(text: s.album);
     _genre = TextEditingController(text: s.genre);
     _year = TextEditingController(text: s.year > 0 ? '${s.year}' : '');
@@ -123,8 +120,10 @@ class _EditSongPageState extends State<EditSongPage> {
         actions: [
           TextButton(
             onPressed: _busy ? null : _save,
-            child: Text('Kaydet',
-                style: TextStyle(color: kGreen, fontWeight: FontWeight.bold)),
+            child: Text(
+              'Kaydet',
+              style: TextStyle(color: kGreen, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -138,8 +137,7 @@ class _EditSongPageState extends State<EditSongPage> {
                 alignment: Alignment.center,
                 children: [
                   Cover(size: 180, bytes: _cover),
-                  if (_busy)
-                    CircularProgressIndicator(color: kGreen),
+                  if (_busy) CircularProgressIndicator(color: kGreen),
                 ],
               ),
             ),
@@ -165,9 +163,9 @@ class _EditSongPageState extends State<EditSongPage> {
                   onPressed: _busy
                       ? null
                       : () => setState(() {
-                            _cover = null;
-                            _coverChanged = true;
-                          }),
+                          _cover = null;
+                          _coverChanged = true;
+                        }),
                   icon: const Icon(Icons.hide_image_outlined),
                   label: const Text('Kapağı kaldır'),
                 ),
@@ -205,8 +203,7 @@ class _EditSongPageState extends State<EditSongPage> {
                   controller: _year,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
-                  decoration:
-                      const InputDecoration(labelText: 'Yıl', counterText: ''),
+                  decoration: const InputDecoration(labelText: 'Yıl', counterText: ''),
                 ),
               ),
               const SizedBox(width: 16),
@@ -215,8 +212,7 @@ class _EditSongPageState extends State<EditSongPage> {
                   controller: _track,
                   keyboardType: TextInputType.number,
                   maxLength: 3,
-                  decoration: const InputDecoration(
-                      labelText: 'Albümdeki sıra', counterText: ''),
+                  decoration: const InputDecoration(labelText: 'Albümdeki sıra', counterText: ''),
                 ),
               ),
             ],
@@ -226,7 +222,6 @@ class _EditSongPageState extends State<EditSongPage> {
     );
   }
 }
-
 
 /// "İnternette ara" penceresi: serbest metinle arar, sonuç listesinden seçtirir.
 class _CandidateSheet extends StatefulWidget {
@@ -295,9 +290,10 @@ class _CandidateSheetState extends State<_CandidateSheet> {
               padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('İnternette ara',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'İnternette ara',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
             Padding(
@@ -305,8 +301,9 @@ class _CandidateSheetState extends State<_CandidateSheet> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                    'Bir sonuca dokun: ad, sanatçı, albüm ve kapak doldurulur.',
-                    style: TextStyle(color: kText54, fontSize: 12)),
+                  'Bir sonuca dokun: ad, sanatçı, albüm ve kapak doldurulur.',
+                  style: TextStyle(color: kText54, fontSize: 12),
+                ),
               ),
             ),
             Padding(
@@ -317,10 +314,7 @@ class _CandidateSheetState extends State<_CandidateSheet> {
                 onSubmitted: (_) => _search(),
                 decoration: InputDecoration(
                   hintText: 'Sanatçı ve şarkı adı',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: _search,
-                  ),
+                  suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
                 ),
               ),
             ),
@@ -328,48 +322,44 @@ class _CandidateSheetState extends State<_CandidateSheet> {
               child: _loading
                   ? Center(child: CircularProgressIndicator(color: kGreen))
                   : _error != null
-                      ? Center(
-                          child: Text(_error!,
-                              style: TextStyle(color: kText60)))
-                      : (_searched && _results.isEmpty)
-                          ? Center(
-                              child: Text('Sonuç yok, aramayı değiştir',
-                                  style: TextStyle(color: kText60)))
-                          : ListView.builder(
-                              itemCount: _results.length,
-                              itemBuilder: (_, i) {
-                                final r = _results[i];
-                                return ListTile(
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Image.network(
-                                      r.thumbUrl,
-                                      width: 48,
-                                      height: 48,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Container(
-                                        width: 48,
-                                        height: 48,
-                                        color: Colors.grey.shade800,
-                                        child: const Icon(Icons.music_note),
-                                      ),
-                                    ),
-                                  ),
-                                  title: Text(r.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                  subtitle: Text(
-                                      r.album.isEmpty
-                                          ? r.artist
-                                          : '${r.artist} • ${r.album}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          color: kText60)),
-                                  onTap: () => Navigator.pop(context, r),
-                                );
-                              },
+                  ? Center(
+                      child: Text(_error!, style: TextStyle(color: kText60)),
+                    )
+                  : (_searched && _results.isEmpty)
+                  ? Center(
+                      child: Text('Sonuç yok, aramayı değiştir', style: TextStyle(color: kText60)),
+                    )
+                  : ListView.builder(
+                      itemCount: _results.length,
+                      itemBuilder: (_, i) {
+                        final r = _results[i];
+                        return ListTile(
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(
+                              r.thumbUrl,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                width: 48,
+                                height: 48,
+                                color: Colors.grey.shade800,
+                                child: const Icon(Icons.music_note),
+                              ),
                             ),
+                          ),
+                          title: Text(r.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(
+                            r.album.isEmpty ? r.artist : '${r.artist} • ${r.album}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: kText60),
+                          ),
+                          onTap: () => Navigator.pop(context, r),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

@@ -37,14 +37,14 @@ class _LibraryPageState extends State<LibraryPage> {
               child: Row(
                 children: [
                   const Expanded(
-                    child: Text('Kitaplığın',
-                        style: TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      'Kitaplığın',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
                   ),
                   if (kOnlineCovers || kOnlineLyrics)
                     IconButton(
-                      icon: Icon(c.coversRunning ? Icons.close : Icons.refresh,
-                          size: 26),
+                      icon: Icon(c.coversRunning ? Icons.close : Icons.refresh, size: 26),
                       tooltip: c.coversRunning
                           ? 'Aramayı durdur'
                           : 'Listeyi yenile (eksik kapak ve sözleri bul)',
@@ -54,13 +54,9 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                   if (kOnlineCovers)
                     IconButton(
-                      icon: Icon(c.metaRunning ? Icons.close : Icons.sell_outlined,
-                          size: 25),
-                      tooltip: c.metaRunning
-                          ? 'Aramayı durdur'
-                          : 'Tür, yıl ve albüm sırasını bul',
-                      onPressed:
-                          c.metaRunning ? c.cancelMeta : c.refreshMeta,
+                      icon: Icon(c.metaRunning ? Icons.close : Icons.sell_outlined, size: 25),
+                      tooltip: c.metaRunning ? 'Aramayı durdur' : 'Tür, yıl ve albüm sırasını bul',
+                      onPressed: c.metaRunning ? c.cancelMeta : c.refreshMeta,
                     ),
                   IconButton(
                     icon: const Icon(Icons.add, size: 28),
@@ -83,23 +79,20 @@ class _LibraryPageState extends State<LibraryPage> {
                   children: [
                     LinearProgressIndicator(
                       minHeight: 2,
-                      value: c.coversTotal == 0
-                          ? null
-                          : c.coversDone / c.coversTotal,
+                      value: c.coversTotal == 0 ? null : c.coversDone / c.coversTotal,
                     ),
                     const SizedBox(height: 4),
-                    Text('Kapaklar ve sözler aranıyor… ${c.coversDone}/${c.coversTotal}',
-                        style: TextStyle(
-                            fontSize: 12, color: kText60)),
+                    Text(
+                      'Kapaklar ve sözler aranıyor… ${c.coversDone}/${c.coversTotal}',
+                      style: TextStyle(fontSize: 12, color: kText60),
+                    ),
                   ],
                 ),
               )
             else if (c.coversNote != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(c.coversNote!,
-                    style:
-                        TextStyle(fontSize: 12, color: kText60)),
+                child: Text(c.coversNote!, style: TextStyle(fontSize: 12, color: kText60)),
               ),
             if (c.metaRunning)
               Padding(
@@ -113,63 +106,54 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                        'Tür, yıl ve albüm sırası aranıyor… ${c.metaDone}/${c.metaTotal}',
-                        style: TextStyle(fontSize: 12, color: kText60)),
+                      'Tür, yıl ve albüm sırası aranıyor… ${c.metaDone}/${c.metaTotal}',
+                      style: TextStyle(fontSize: 12, color: kText60),
+                    ),
                   ],
                 ),
               )
             else if (c.metaNote != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(c.metaNote!,
-                    style: TextStyle(fontSize: 12, color: kText60)),
+                child: Text(c.metaNote!, style: TextStyle(fontSize: 12, color: kText60)),
               ),
             _CollectionRow(
-              leading: const _IconSquare(
-                  Icons.favorite, [Color(0xFF4A2BD8), Color(0xFF9DB6E8)]),
+              leading: const _IconSquare(Icons.favorite, [Color(0xFF4A2BD8), Color(0xFF9DB6E8)]),
               title: 'Beğenilen Şarkılar',
               subtitle: 'Çalma listesi • ${countAndTotal(liked)}',
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const CollectionPage.liked(),
-              )),
+              onTap: () =>
+                  Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const CollectionPage.liked())),
             ),
             _CollectionRow(
-              leading: _IconSquare(
-                  Icons.library_music, [Color(0xFF1B6B3A), kGreen]),
+              leading: _IconSquare(Icons.library_music, [Color(0xFF1B6B3A), kGreen]),
               title: 'Tüm Şarkılar',
               subtitle: 'Kitaplık • ${countAndTotal(c.songs)}',
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const CollectionPage.all(),
-              )),
+              onTap: () =>
+                  Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const CollectionPage.all())),
             ),
             if (c.songs.isNotEmpty)
               _CollectionRow(
-                leading: const _IconSquare(
-                    Icons.person, [Color(0xFF8E24AA), Color(0xFFE91E8C)]),
+                leading: const _IconSquare(Icons.person, [Color(0xFF8E24AA), Color(0xFFE91E8C)]),
                 title: 'Sanatçılar',
-                subtitle:
-                    'Kitaplık • ${groupSongs(c.songs, byAlbum: false).length} sanatçı',
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const GroupListPage(byAlbum: false),
-                )),
+                subtitle: 'Kitaplık • ${groupSongs(c.songs, byAlbum: false).length} sanatçı',
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const GroupListPage(byAlbum: false))),
               ),
             if (c.songs.any((s) => s.album.trim().isNotEmpty))
               _CollectionRow(
-                leading: const _IconSquare(
-                    Icons.album, [Color(0xFF00695C), Color(0xFF26A69A)]),
+                leading: const _IconSquare(Icons.album, [Color(0xFF00695C), Color(0xFF26A69A)]),
                 title: 'Albümler',
-                subtitle:
-                    'Kitaplık • ${groupSongs(c.songs, byAlbum: true).length} albüm',
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const GroupListPage(byAlbum: true),
-                )),
+                subtitle: 'Kitaplık • ${groupSongs(c.songs, byAlbum: true).length} albüm',
+                onTap: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const GroupListPage(byAlbum: true))),
               ),
             if (c.playlists.length > 1)
               SortBar(
                 label: _sortLabels[_sort],
                 onTap: () async {
-                  final i = await showSortSheet(context,
-                      options: _sortLabels, selected: _sort);
+                  final i = await showSortSheet(context, options: _sortLabels, selected: _sort);
                   if (i != null && mounted) setState(() => _sort = i);
                 },
               ),
@@ -214,12 +198,13 @@ class _CollectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: leading,
-      title: Text(title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(subtitle,
-          style: TextStyle(color: kText60, fontSize: 13)),
+      title: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(subtitle, style: TextStyle(color: kText60, fontSize: 13)),
       onTap: onTap,
     );
   }
@@ -274,14 +259,8 @@ class MosaicCover extends StatelessWidget {
         height: size,
         child: Column(
           children: [
-            Row(children: [
-              _tile(covers[0], half),
-              _tile(covers[1], half),
-            ]),
-            Row(children: [
-              _tile(covers[2], half),
-              _tile(covers[3], half),
-            ]),
+            Row(children: [_tile(covers[0], half), _tile(covers[1], half)]),
+            Row(children: [_tile(covers[2], half), _tile(covers[3], half)]),
           ],
         ),
       ),
@@ -289,19 +268,19 @@ class MosaicCover extends StatelessWidget {
   }
 
   Widget _tile(Uint8List b, double s) => SizedBox(
-        width: s,
-        height: s,
-        child: Image.memory(b,
-            fit: BoxFit.cover,
-            cacheWidth: (s * 3).round(),
-            gaplessPlayback: true,
-            errorBuilder: (_, _, _) => Container(color: Colors.grey.shade800)),
-      );
+    width: s,
+    height: s,
+    child: Image.memory(
+      b,
+      fit: BoxFit.cover,
+      cacheWidth: (s * 3).round(),
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => Container(color: Colors.grey.shade800),
+    ),
+  );
 }
 
 // ================= Liste sayfası =================
 void openPlaylist(BuildContext context, Playlist p) {
-  Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => CollectionPage.playlist(p),
-  ));
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => CollectionPage.playlist(p)));
 }

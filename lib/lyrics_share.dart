@@ -5,15 +5,12 @@ import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:share_plus/share_plus.dart';
 
 import 'lyrics.dart';
-import 'main.dart'
-    show kBg, kGreen, kText, kText38, kText54, kText60, lyricsBg, shadeTint;
+import 'main.dart' show kBg, kGreen, kText, kText38, kText54, kText60, lyricsBg, shadeTint;
 import 'player_controller.dart';
 
 /// Şarkı sözü paylaşma kartı səhifəsini açır.
 void openLyricsShare(BuildContext context, Song song) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => LyricsSharePage(song: song)),
-  );
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => LyricsSharePage(song: song)));
 }
 
 /// Sözlərdən 1-6 sətir seçilir, kapak fonlu şəkil kartı yaranır və paylaşılır.
@@ -43,9 +40,8 @@ class _LyricsSharePageState extends State<LyricsSharePage> {
       if (_sel.contains(i)) {
         _sel.remove(i);
       } else if (_sel.length >= _maxLines) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('En fazla 6 satır seçebilirsin')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('En fazla 6 satır seçebilirsin')));
       } else {
         _sel.add(i);
       }
@@ -64,21 +60,19 @@ class _LyricsSharePageState extends State<LyricsSharePage> {
     final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
     setState(() => _busy = true);
     try {
-      final b = _boundaryKey.currentContext?.findRenderObject()
-          as RenderRepaintBoundary?;
+      final b = _boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (b == null) throw Exception('Kart hazır değil');
       // pixelRatio 1.0: kartın içi 1080x1350 olduğu üçün çıxış da 1080x1350 piksel olur
       final img = await b.toImage(pixelRatio: 1.0);
       final data = await img.toByteData(format: ui.ImageByteFormat.png);
       if (data == null) throw Exception('Görsel oluşturulamadı');
       final bytes = data.buffer.asUint8List();
-      await SharePlus.instance.share(ShareParams(
-        files: [
-          XFile.fromData(bytes,
-              mimeType: 'image/png', name: 'cloudio_soz_karti.png')
-        ],
-        sharePositionOrigin: origin,
-      ));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(bytes, mimeType: 'image/png', name: 'cloudio_soz_karti.png')],
+          sharePositionOrigin: origin,
+        ),
+      );
     } catch (e) {
       _snack('Paylaşılamadı: $e');
     } finally {
@@ -93,13 +87,11 @@ class _LyricsSharePageState extends State<LyricsSharePage> {
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text('Söz kartı',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Söz kartı', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: lines.isEmpty
           ? Center(
-              child: Text('Bu şarkının sözü yok.',
-                  style: TextStyle(color: kText60)),
+              child: Text('Bu şarkının sözü yok.', style: TextStyle(color: kText60)),
             )
           : Column(
               children: [
@@ -128,8 +120,9 @@ class _LyricsSharePageState extends State<LyricsSharePage> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                        'Kartta görünmesini istediğin satırlara dokun (${_sel.length}/$_maxLines)',
-                        style: TextStyle(color: kText54, fontSize: 12)),
+                      'Kartta görünmesini istediğin satırlara dokun (${_sel.length}/$_maxLines)',
+                      style: TextStyle(color: kText54, fontSize: 12),
+                    ),
                   ),
                 ),
                 Expanded(
@@ -143,25 +136,24 @@ class _LyricsSharePageState extends State<LyricsSharePage> {
                       return InkWell(
                         onTap: () => _toggle(i),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 9),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
                           child: Row(
                             children: [
                               Icon(
-                                  on
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  color: on ? kGreen : kText38,
-                                  size: 22),
+                                on ? Icons.check_circle : Icons.radio_button_unchecked,
+                                color: on ? kGreen : kText38,
+                                size: 22,
+                              ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(t,
-                                    style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: on
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                        color: on ? kGreen : kText)),
+                                child: Text(
+                                  t,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: on ? FontWeight.bold : FontWeight.normal,
+                                    color: on ? kGreen : kText,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -178,8 +170,7 @@ class _LyricsSharePageState extends State<LyricsSharePage> {
                       builder: (btnCtx) => SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed:
-                              (_sel.isEmpty || _busy) ? null : () => _share(btnCtx),
+                          onPressed: (_sel.isEmpty || _busy) ? null : () => _share(btnCtx),
                           icon: const Icon(Icons.ios_share),
                           label: Text(_busy ? 'Hazırlanıyor...' : 'Paylaş'),
                         ),
@@ -215,8 +206,7 @@ class _QuoteCard extends StatelessWidget {
               scale: 1.4,
               child: ImageFiltered(
                 imageFilter: ui.ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-                child: Image.memory(cover,
-                    fit: BoxFit.cover, gaplessPlayback: true),
+                child: Image.memory(cover, fit: BoxFit.cover, gaplessPlayback: true),
               ),
             ),
             Container(color: Colors.black.withValues(alpha: 0.45)),
@@ -250,12 +240,10 @@ class _QuoteCard extends StatelessWidget {
                     width: 220,
                     height: 220,
                     child: cover != null
-                        ? Image.memory(cover,
-                            fit: BoxFit.cover, gaplessPlayback: true)
+                        ? Image.memory(cover, fit: BoxFit.cover, gaplessPlayback: true)
                         : Container(
                             color: Colors.white24,
-                            child: const Icon(Icons.music_note,
-                                size: 110, color: Colors.white70),
+                            child: const Icon(Icons.music_note, size: 110, color: Colors.white70),
                           ),
                   ),
                 ),
@@ -282,29 +270,36 @@ class _QuoteCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 40),
-                Text(song.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 52,
-                        fontWeight: FontWeight.bold)),
+                Text(
+                  song.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 52,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: Text(song.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 38)),
+                      child: Text(
+                        song.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 38),
+                      ),
                     ),
                     const SizedBox(width: 20),
-                    const Text('Cloudio',
-                        style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 34,
-                            fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Cloudio',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ],

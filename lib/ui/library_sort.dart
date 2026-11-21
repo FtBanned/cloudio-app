@@ -4,11 +4,11 @@ part of '../main.dart';
 enum SongSort { standard, newest, title, artist }
 
 String songSortLabel(SongSort s) => switch (s) {
-      SongSort.standard => 'Varsayılan',
-      SongSort.newest => 'Son eklenen',
-      SongSort.title => 'Ada göre',
-      SongSort.artist => 'Sanatçıya göre',
-    };
+  SongSort.standard => 'Varsayılan',
+  SongSort.newest => 'Son eklenen',
+  SongSort.title => 'Ada göre',
+  SongSort.artist => 'Sanatçıya göre',
+};
 
 int _cmpText(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
 
@@ -30,9 +30,14 @@ List<Song> albumOrder(List<Song> src) {
 
 /// "2019 • Pop • 12 şarkı • 47 dk" (il və janr yalnız varsa).
 String albumInfo(List<Song> list) {
-  final years = [for (final s in list) if (s.year > 0) s.year];
-  final genre = list.firstWhere((s) => s.genre.trim().isNotEmpty,
-      orElse: () => list.first).genre.trim();
+  final years = [
+    for (final s in list)
+      if (s.year > 0) s.year,
+  ];
+  final genre = list
+      .firstWhere((s) => s.genre.trim().isNotEmpty, orElse: () => list.first)
+      .genre
+      .trim();
   final parts = <String>[
     if (years.isNotEmpty) '${years.reduce((a, b) => a < b ? a : b)}',
     if (genre.isNotEmpty) genre,
@@ -77,8 +82,11 @@ List<Song> sortedSongs(List<Song> src, SongSort sort) {
 }
 
 /// Aşağıdan açılan "Sırala" menyusu. Seçilən variantın indeksini qaytarır (ləğv: null).
-Future<int?> showSortSheet(BuildContext context,
-    {required List<String> options, required int selected}) {
+Future<int?> showSortSheet(
+  BuildContext context, {
+  required List<String> options,
+  required int selected,
+}) {
   return showModalBottomSheet<int>(
     context: context,
     backgroundColor: kCard,
@@ -93,19 +101,19 @@ Future<int?> showSortSheet(BuildContext context,
             padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Sırala',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text('Sırala', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ),
           for (var i = 0; i < options.length; i++)
             ListTile(
-              title: Text(options[i],
-                  style: TextStyle(
-                      color: i == selected ? kGreen : null,
-                      fontWeight:
-                          i == selected ? FontWeight.bold : FontWeight.normal)),
-              trailing:
-                  i == selected ? Icon(Icons.check, color: kGreen) : null,
+              title: Text(
+                options[i],
+                style: TextStyle(
+                  color: i == selected ? kGreen : null,
+                  fontWeight: i == selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              trailing: i == selected ? Icon(Icons.check, color: kGreen) : null,
               onTap: () => Navigator.pop(ctx, i),
             ),
           const SizedBox(height: 8),
@@ -137,8 +145,7 @@ class SortBar extends StatelessWidget {
               children: [
                 const Icon(Icons.swap_vert, size: 20),
                 const SizedBox(width: 6),
-                Text(label,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
               ],
             ),
           ),

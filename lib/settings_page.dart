@@ -5,15 +5,7 @@ import 'package:video_player/video_player.dart';
 
 import 'app_theme.dart';
 import 'main.dart'
-    show
-        kCard,
-        kGreen,
-        kText,
-        kText38,
-        kText54,
-        kText70,
-        formatTotal,
-        showSleepSheet;
+    show kCard, kGreen, kText, kText38, kText54, kText70, formatTotal, showSleepSheet;
 import 'backup_page.dart';
 import 'booster.dart';
 import 'booster_page.dart';
@@ -24,9 +16,7 @@ import 'stats_page.dart';
 
 /// Ayarlar səhifəsini açır (profil şəkli və Now Playing-dəki "tune" düyməsi bunu çağırır).
 void openSettings(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
-  );
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage()));
 }
 
 String crossfadeLabel(double v) {
@@ -50,14 +40,12 @@ class SettingsPage extends StatelessWidget {
     final c = PlayerController.instance;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ayarlar',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Ayarlar', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: ListenableBuilder(
         listenable: c,
         builder: (context, _) => ListView(
-          padding: EdgeInsets.only(
-              bottom: 24 + MediaQuery.of(context).padding.bottom),
+          padding: EdgeInsets.only(bottom: 24 + MediaQuery.of(context).padding.bottom),
           children: [
             // ---------- Hesap ----------
             const _ProfileCard(),
@@ -66,8 +54,9 @@ class SettingsPage extends StatelessWidget {
               leading: Icon(Icons.insights_outlined, color: kGreen),
               title: const Text('Kişisel istatistik'),
               subtitle: Text(
-                  'Aylık sanatçılar, dinleme süresi, en çok dinlenenler',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                'Aylık sanatçılar, dinleme süresi, en çok dinlenenler',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
               trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => openStats(context),
             ),
@@ -82,11 +71,7 @@ class SettingsPage extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   for (final v in PlayerController.speedOptions)
-                    _Chip(
-                      label: speedLabel(v),
-                      selected: c.speed == v,
-                      onTap: () => c.setSpeed(v),
-                    ),
+                    _Chip(label: speedLabel(v), selected: c.speed == v, onTap: () => c.setSpeed(v)),
                 ],
               ),
             ),
@@ -96,11 +81,12 @@ class SettingsPage extends StatelessWidget {
                 leading: Icon(Icons.graphic_eq, color: kGreen),
                 title: const Text('Ses güçlendirici'),
                 subtitle: Text(
-                    Booster.instance.enabled
-                        ? 'Açık: ${Booster.instance.label} • '
+                  Booster.instance.enabled
+                      ? 'Açık: ${Booster.instance.label} • '
                             '${Booster.kClarityNames[Booster.instance.clarity]}'
-                        : 'Kapalı • 2x–10x güçlendirme ve netlik',
-                    style: TextStyle(color: kText54, fontSize: 12)),
+                      : 'Kapalı • 2x–10x güçlendirme ve netlik',
+                  style: TextStyle(color: kText54, fontSize: 12),
+                ),
                 trailing: Icon(Icons.chevron_right, color: kText38),
                 onTap: () => openBoosterPage(context),
               ),
@@ -129,9 +115,10 @@ class SettingsPage extends StatelessWidget {
               activeThumbColor: kGreen,
               title: const Text('Ses seviyesini dengele'),
               subtitle: Text(
-                  'Şarkılar arası ses farkını azaltır (ReplayGain etiketine göre). '
-                  '${c.gainTaggedCount}/${c.songs.length} şarkıda etiket var.',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                'Şarkılar arası ses farkını azaltır (ReplayGain etiketine göre). '
+                '${c.gainTaggedCount}/${c.songs.length} şarkıda etiket var.',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
               value: c.normalizeOn,
               onChanged: c.setNormalize,
             ),
@@ -143,8 +130,9 @@ class SettingsPage extends StatelessWidget {
               activeThumbColor: kGreen,
               title: const Text('Dinamik arka plan'),
               subtitle: Text(
-                  'Çalıyor ekranının arka planı albüm kapağının renklerinden oluşur.',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                'Çalıyor ekranının arka planı albüm kapağının renklerinden oluşur.',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
               value: c.dynamicBg,
               onChanged: c.setDynamicBg,
             ),
@@ -152,13 +140,12 @@ class SettingsPage extends StatelessWidget {
             // ---------- Uyku zamanlayıcısı ----------
             const _SectionTitle('Uyku zamanlayıcısı'),
             ListTile(
-              leading: Icon(Icons.bedtime_outlined,
-                  color: c.sleepActive ? kGreen : kText70),
+              leading: Icon(Icons.bedtime_outlined, color: c.sleepActive ? kGreen : kText70),
               title: const Text('Müziği otomatik durdur'),
-              subtitle: Text(_sleepStatus(c),
-                  style: TextStyle(
-                      color: c.sleepActive ? kGreen : kText54,
-                      fontSize: 12)),
+              subtitle: Text(
+                _sleepStatus(c),
+                style: TextStyle(color: c.sleepActive ? kGreen : kText54, fontSize: 12),
+              ),
               trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => showSleepSheet(context),
             ),
@@ -166,21 +153,22 @@ class SettingsPage extends StatelessWidget {
             // ---------- Kitaplık ----------
             const _SectionTitle('Kitaplık'),
             ListTile(
-              leading: Icon(Icons.library_music_outlined,
-                  color: kText70),
+              leading: Icon(Icons.library_music_outlined, color: kText70),
               title: Text('${c.songs.length} şarkı'),
               subtitle: Text(
-                  formatTotal(c.songs).isEmpty
-                      ? 'Toplam süre henüz bilinmiyor'
-                      : 'Toplam süre: ${formatTotal(c.songs)}',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                formatTotal(c.songs).isEmpty
+                    ? 'Toplam süre henüz bilinmiyor'
+                    : 'Toplam süre: ${formatTotal(c.songs)}',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
             ),
             ListTile(
               leading: Icon(Icons.copy_all_outlined, color: kGreen),
               title: const Text('Tekrar eden şarkıları bul'),
               subtitle: Text(
-                  'Aynı şarkının farklı formatlardaki kopyalarını yakalar',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+                'Aynı şarkının farklı formatlardaki kopyalarını yakalar',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
               trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => openDuplicates(context),
             ),
@@ -189,14 +177,14 @@ class SettingsPage extends StatelessWidget {
                 leading: Icon(Icons.cloud_upload_outlined, color: kGreen),
                 title: const Text('Yedekle ve geri yükle'),
                 subtitle: Text(
-                    c.missingAudioCount > 0
-                        ? '${c.missingAudioCount} şarkının ses dosyası eksik'
-                        : 'Kitaplığını dosyaya kaydet, uygulamayı silsen bile geri getir',
-                    style: TextStyle(
-                        color: c.missingAudioCount > 0
-                            ? Colors.orangeAccent
-                            : kText54,
-                        fontSize: 12)),
+                  c.missingAudioCount > 0
+                      ? '${c.missingAudioCount} şarkının ses dosyası eksik'
+                      : 'Kitaplığını dosyaya kaydet, uygulamayı silsen bile geri getir',
+                  style: TextStyle(
+                    color: c.missingAudioCount > 0 ? Colors.orangeAccent : kText54,
+                    fontSize: 12,
+                  ),
+                ),
                 trailing: Icon(Icons.chevron_right, color: kText38),
                 onTap: () => openBackupPage(context),
               ),
@@ -212,8 +200,7 @@ class SettingsPage extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.info_outline, color: kText70),
               title: Text('Cloudio'),
-              subtitle: Text('Sürüm 1.0.0',
-                  style: TextStyle(color: kText54, fontSize: 12)),
+              subtitle: Text('Sürüm 1.0.0', style: TextStyle(color: kText54, fontSize: 12)),
             ),
           ],
         ),
@@ -243,12 +230,15 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: kText54,
-              letterSpacing: 0.5)),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: kText54,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }
@@ -259,12 +249,7 @@ class _Block extends StatelessWidget {
   final String trailing;
   final String? note;
   final Widget child;
-  const _Block({
-    required this.title,
-    required this.trailing,
-    required this.child,
-    this.note,
-  });
+  const _Block({required this.title, required this.trailing, required this.child, this.note});
 
   @override
   Widget build(BuildContext context) {
@@ -275,20 +260,18 @@ class _Block extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(title, style: const TextStyle(fontSize: 16)),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 16))),
+              Text(
+                trailing,
+                style: TextStyle(color: kGreen, fontWeight: FontWeight.w600),
               ),
-              Text(trailing,
-                  style: TextStyle(
-                      color: kGreen, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 10),
           child,
           if (note != null) ...[
             const SizedBox(height: 8),
-            Text(note!,
-                style: TextStyle(color: kText54, fontSize: 12)),
+            Text(note!, style: TextStyle(color: kText54, fontSize: 12)),
           ],
         ],
       ),
@@ -339,10 +322,9 @@ class _ThemeBlock extends StatelessWidget {
                       color: kAccentColors[i].$2,
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: t.accentIndex == i
-                              ? kText
-                              : Colors.transparent,
-                          width: 2.5),
+                        color: t.accentIndex == i ? kText : Colors.transparent,
+                        width: 2.5,
+                      ),
                     ),
                     child: t.accentIndex == i
                         ? const Icon(Icons.check, size: 20, color: Colors.black)
@@ -361,8 +343,7 @@ class _Chip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _Chip(
-      {required this.label, required this.selected, required this.onTap});
+  const _Chip({required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -374,15 +355,14 @@ class _Chip extends StatelessWidget {
           color: selected ? kGreen : kCard,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? Colors.black : kText,
-                fontWeight: FontWeight.w600)),
+        child: Text(
+          label,
+          style: TextStyle(color: selected ? Colors.black : kText, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
 }
-
 
 // ================= Hesap / profil =================
 
@@ -412,8 +392,18 @@ String _hm(Duration d) {
 }
 
 const _months = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  'Ocak',
+  'Şubat',
+  'Mart',
+  'Nisan',
+  'Mayıs',
+  'Haziran',
+  'Temmuz',
+  'Ağustos',
+  'Eylül',
+  'Ekim',
+  'Kasım',
+  'Aralık',
 ];
 
 /// Gradient halqalı dairəvi avatar: hərf = adın ilk hərfi.
@@ -453,11 +443,14 @@ class ProfileCircle extends StatelessWidget {
                 // 1920x1080 şəkli tam ölçüdə yaddaşa yükləməsin
                 cacheWidth: (radius * 2 * 4).round(),
                 errorBuilder: (_, _, _) => Center(
-                  child: Text(_initial(c.profileName),
-                      style: TextStyle(
-                          fontSize: radius * 0.95,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
+                  child: Text(
+                    _initial(c.profileName),
+                    style: TextStyle(
+                      fontSize: radius * 0.95,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -484,9 +477,10 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-              color: light.withValues(alpha: 0.20),
-              blurRadius: 24,
-              offset: const Offset(0, 8)),
+            color: light.withValues(alpha: 0.20),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       foregroundDecoration: BoxDecoration(
@@ -500,76 +494,78 @@ class _ProfileCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(18),
             child: DarkZone(
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const ProfileCircle(radius: 34),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(c.profileName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    const _AdminBadge(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const ProfileCircle(radius: 34),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c.profileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 6),
+                            const _AdminBadge(),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Profili düzenle',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _editProfile(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      _Stat(value: '${c.songs.length}', label: 'Şarkı'),
+                      _Stat(value: '${c.totalPlays}', label: 'Dinleme'),
+                      _Stat(value: _hm(c.listenedTime), label: 'Süre'),
+                    ],
+                  ),
+                  if (top != null) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Icon(Icons.local_fire_department, size: 18, color: light),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'En çok dinlenen: ${top.$1} (${top.$2} kez)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(foregroundColor: light, padding: EdgeInsets.zero),
+                      onPressed: () => openStats(context),
+                      icon: const Icon(Icons.insights_outlined, size: 18),
+                      label: const Text('Kişisel istatistik'),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Bu cihazdaki yerel hesap • ${_months[since.month - 1]} ${since.year}'
+                    ' tarihinden beri',
+                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                ],
               ),
-              IconButton(
-                tooltip: 'Profili düzenle',
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: () => _editProfile(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              _Stat(value: '${c.songs.length}', label: 'Şarkı'),
-              _Stat(value: '${c.totalPlays}', label: 'Dinleme'),
-              _Stat(value: _hm(c.listenedTime), label: 'Süre'),
-            ],
-          ),
-          if (top != null) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Icon(Icons.local_fire_department, size: 18, color: light),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text('En çok dinlenen: ${top.$1} (${top.$2} kez)',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 13)),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                  foregroundColor: light, padding: EdgeInsets.zero),
-              onPressed: () => openStats(context),
-              icon: const Icon(Icons.insights_outlined, size: 18),
-              label: const Text('Kişisel istatistik'),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-              'Bu cihazdaki yerel hesap • ${_months[since.month - 1]} ${since.year}'
-              ' tarihinden beri',
-              style: const TextStyle(color: Colors.white38, fontSize: 11)),
-        ],
-      ),
             ),
           ),
         ],
@@ -586,20 +582,21 @@ class _ProfileCard extends StatelessWidget {
       backgroundColor: kCard,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Padding(
-          padding: EdgeInsets.fromLTRB(
-              20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
           child: SafeArea(
             top: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Profili düzenle',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Profili düzenle',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: ctl,
@@ -608,9 +605,10 @@ class _ProfileCard extends StatelessWidget {
                   decoration: const InputDecoration(labelText: 'Ad'),
                 ),
                 const SizedBox(height: 8),
-                Text('Renk',
-                    style: TextStyle(
-                        color: kText70, fontWeight: FontWeight.w600)),
+                Text(
+                  'Renk',
+                  style: TextStyle(color: kText70, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 12,
@@ -630,14 +628,12 @@ class _ProfileCard extends StatelessWidget {
                               colors: [kProfileColors[i].$1, kProfileColors[i].$2],
                             ),
                             border: Border.all(
-                                color: color == i
-                                    ? kText
-                                    : Colors.transparent,
-                                width: 2.5),
+                              color: color == i ? kText : Colors.transparent,
+                              width: 2.5,
+                            ),
                           ),
                           child: color == i
-                              ? const Icon(Icons.check,
-                                  size: 20, color: Colors.white)
+                              ? const Icon(Icons.check, size: 20, color: Colors.white)
                               : null,
                         ),
                       ),
@@ -648,7 +644,9 @@ class _ProfileCard extends StatelessWidget {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                        backgroundColor: kGreen, foregroundColor: Colors.black),
+                      backgroundColor: kGreen,
+                      foregroundColor: Colors.black,
+                    ),
                     onPressed: () {
                       c.setProfile(name: ctl.text, color: color);
                       Navigator.pop(ctx);
@@ -679,8 +677,7 @@ class _AdminBackdrop extends StatefulWidget {
   State<_AdminBackdrop> createState() => _AdminBackdropState();
 }
 
-class _AdminBackdropState extends State<_AdminBackdrop>
-    with WidgetsBindingObserver {
+class _AdminBackdropState extends State<_AdminBackdrop> with WidgetsBindingObserver {
   VideoPlayerController? _vc;
   bool _ready = false;
   bool _gone = false;
@@ -806,20 +803,22 @@ class _AdminBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-            colors: [Color(0xFFFFE082), Color(0xFFFFB300)]),
+        gradient: const LinearGradient(colors: [Color(0xFFFFE082), Color(0xFFFFB300)]),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.workspace_premium, size: 15, color: Color(0xFF4A3300)),
           SizedBox(width: 4),
-          Text('ADMIN',
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
-                  color: Color(0xFF4A3300))),
+          Text(
+            'ADMIN',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+              color: Color(0xFF4A3300),
+            ),
+          ),
         ],
       ),
     );
@@ -836,14 +835,14 @@ class _Stat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text(value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(color: kText54, fontSize: 12)),
+          Text(label, style: TextStyle(color: kText54, fontSize: 12)),
         ],
       ),
     );

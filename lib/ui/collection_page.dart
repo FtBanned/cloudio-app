@@ -17,8 +17,7 @@ class SongGroup {
   }
 }
 
-String _groupName(Song s, bool byAlbum) =>
-    (byAlbum ? s.album : s.artist).trim();
+String _groupName(Song s, bool byAlbum) => (byAlbum ? s.album : s.artist).trim();
 
 /// Mahnıları sənətçiyə (və ya albomə) görə qruplaşdırır; adlar böyük/kiçik hərfə həssas deyil.
 /// Albomu boş olan mahnılar albom siyahısına düşmür.
@@ -39,29 +38,29 @@ class CollectionPage extends StatefulWidget {
   final String? groupName; // sənətçi / albom adı
 
   const CollectionPage.all({super.key})
-      : _kind = _CollectionKind.all,
-        playlistRef = null,
-        groupName = null;
+    : _kind = _CollectionKind.all,
+      playlistRef = null,
+      groupName = null;
   const CollectionPage.liked({super.key})
-      : _kind = _CollectionKind.liked,
-        playlistRef = null,
-        groupName = null;
+    : _kind = _CollectionKind.liked,
+      playlistRef = null,
+      groupName = null;
   const CollectionPage.playlist(Playlist p, {super.key})
-      : _kind = _CollectionKind.playlist,
-        playlistRef = p,
-        groupName = null;
+    : _kind = _CollectionKind.playlist,
+      playlistRef = p,
+      groupName = null;
   const CollectionPage.artist(String name, {super.key})
-      : _kind = _CollectionKind.artist,
-        playlistRef = null,
-        groupName = name;
+    : _kind = _CollectionKind.artist,
+      playlistRef = null,
+      groupName = name;
   const CollectionPage.album(String name, {super.key})
-      : _kind = _CollectionKind.album,
-        playlistRef = null,
-        groupName = name;
+    : _kind = _CollectionKind.album,
+      playlistRef = null,
+      groupName = name;
   const CollectionPage.genre(String name, {super.key})
-      : _kind = _CollectionKind.genre,
-        playlistRef = null,
-        groupName = name;
+    : _kind = _CollectionKind.genre,
+      playlistRef = null,
+      groupName = name;
 
   @override
   State<CollectionPage> createState() => _CollectionPageState();
@@ -141,169 +140,152 @@ class _CollectionPageState extends State<CollectionPage> {
           }
         }
         final topDark = shadeTint(tint, const Color(0xFF3A2E5C));
-        final top = AppTheme.instance.isLight
-            ? Color.lerp(kBg, topDark, 0.22)!
-            : topDark;
+        final top = AppTheme.instance.isLight ? Color.lerp(kBg, topDark, 0.22)! : topDark;
         final playingHere = c.isPlaying && c.current != null && list.contains(c.current);
 
         // Siyahının başlıq hissəsi; mahnılar ListView.builder ilə tənbəl (lazy) qurulur
         final header = <Widget>[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                  Center(
-                    child: switch (kind) {
-                      _CollectionKind.liked => const _IconSquare(
-                          Icons.favorite,
-                          [Color(0xFF4A2BD8), Color(0xFF9DB6E8)],
-                          size: 200),
-                      _ => MosaicCover(songs: base, size: 200),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          Center(
+            child: switch (kind) {
+              _CollectionKind.liked => const _IconSquare(Icons.favorite, [
+                Color(0xFF4A2BD8),
+                Color(0xFF9DB6E8),
+              ], size: 200),
+              _ => MosaicCover(songs: base, size: 200),
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+            child: Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              kind == _CollectionKind.album ? albumInfo(list) : countAndTotal(list),
+              style: TextStyle(color: kText60),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Row(
+              children: [
+                if (kind == _CollectionKind.all || kind == _CollectionKind.playlist)
+                  _ActionPill(
+                    icon: Icons.add,
+                    label: 'Ekle',
+                    onTap: () {
+                      if (kind == _CollectionKind.all) {
+                        if (!c.loading) c.addSongs();
+                      } else {
+                        showAddSongsSheet(context, pl!);
+                      }
                     },
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-                    child: Text(title,
-                        style: const TextStyle(
-                            fontSize: 26, fontWeight: FontWeight.bold)),
+                if (kind == _CollectionKind.playlist) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.more_horiz),
+                    onPressed: () => showPlaylistMenu(context, pl!),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                        kind == _CollectionKind.album
-                            ? albumInfo(list)
-                            : countAndTotal(list),
-                        style: TextStyle(color: kText60)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Row(
-                      children: [
-                        if (kind == _CollectionKind.all ||
-                            kind == _CollectionKind.playlist)
-                          _ActionPill(
-                            icon: Icons.add,
-                            label: 'Ekle',
-                            onTap: () {
-                              if (kind == _CollectionKind.all) {
-                                if (!c.loading) c.addSongs();
-                              } else {
-                                showAddSongsSheet(context, pl!);
-                              }
-                            },
-                          ),
-                        if (kind == _CollectionKind.playlist) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.more_horiz),
-                            onPressed: () => showPlaylistMenu(context, pl!),
-                          ),
-                        ],
-                        const Spacer(),
-                        IconButton(
-                          icon: Icon(shuffleIconFor(c),
-                              size: 28,
-                              color: c.shuffleOn ? kGreen : kText),
-                          onPressed: () => showShuffleSheet(context),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: kGreen,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            iconSize: 32,
-                            color: Colors.black,
-                            icon: Icon(
-                                playingHere ? Icons.pause : Icons.play_arrow),
-                            onPressed: list.isEmpty
-                                ? null
-                                : () {
-                                    if (playingHere) {
-                                      c.togglePlay();
-                                    } else if (c.shuffleOn) {
-                                      c.shuffle(context: list);
-                                    } else {
-                                      c.playSong(list.first, context: list);
-                                    }
-                                  },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (base.length > 1 ||
-                      (kind == _CollectionKind.playlist &&
-                          (base.isNotEmpty || _editing)))
-                    Row(
-                      children: [
-                        Expanded(
-                          child: (_editing || base.length < 2)
-                              ? const SizedBox.shrink()
-                              : SortBar(
-                                  label: songSortLabel(_sort),
-                                  onTap: () async {
-                                    final i = await showSortSheet(context,
-                                        options: [
-                                          for (final s in SongSort.values)
-                                            songSortLabel(s)
-                                        ],
-                                        selected: _sort.index);
-                                    if (i != null && mounted) {
-                                      setState(() => _sort = SongSort.values[i]);
-                                    }
-                                  },
-                                ),
-                        ),
-                        if (kind == _CollectionKind.playlist ||
-                            kind == _CollectionKind.all)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: TextButton(
-                              onPressed: () => setState(() {
-                                _editing = !_editing;
-                                // Düzenləmə həqiqi sıra üzərində aparılır
-                                if (_editing) _sort = SongSort.standard;
-                              }),
-                              child: Text(
-                                _editing ? 'Bitti' : 'Düzenle',
-                                style: TextStyle(
-                                  color: _editing ? kGreen : kText,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  if (list.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Center(
-                        child: Text(
-                          switch (kind) {
-                            _CollectionKind.liked =>
-                              'Henüz beğendiğin şarkı yok.\nŞarkının yanındaki ⊕ ile beğen.',
-                            _CollectionKind.all =>
-                              'Henüz şarkı yok.\n"Ekle" ile dosya seç.',
-                            _CollectionKind.playlist =>
-                              'Bu liste boş.\n"Ekle" ile kitaplığından şarkı seç.',
-                            _CollectionKind.artist ||
-                            _CollectionKind.genre ||
-                            _CollectionKind.album =>
-                              'Bu bölümde şarkı yok.',
+                ],
+                const Spacer(),
+                IconButton(
+                  icon: Icon(shuffleIconFor(c), size: 28, color: c.shuffleOn ? kGreen : kText),
+                  onPressed: () => showShuffleSheet(context),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(color: kGreen, shape: BoxShape.circle),
+                  child: IconButton(
+                    iconSize: 32,
+                    color: Colors.black,
+                    icon: Icon(playingHere ? Icons.pause : Icons.play_arrow),
+                    onPressed: list.isEmpty
+                        ? null
+                        : () {
+                            if (playingHere) {
+                              c.togglePlay();
+                            } else if (c.shuffleOn) {
+                              c.shuffle(context: list);
+                            } else {
+                              c.playSong(list.first, context: list);
+                            }
                           },
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: kText60),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (base.length > 1 ||
+              (kind == _CollectionKind.playlist && (base.isNotEmpty || _editing)))
+            Row(
+              children: [
+                Expanded(
+                  child: (_editing || base.length < 2)
+                      ? const SizedBox.shrink()
+                      : SortBar(
+                          label: songSortLabel(_sort),
+                          onTap: () async {
+                            final i = await showSortSheet(
+                              context,
+                              options: [for (final s in SongSort.values) songSortLabel(s)],
+                              selected: _sort.index,
+                            );
+                            if (i != null && mounted) {
+                              setState(() => _sort = SongSort.values[i]);
+                            }
+                          },
+                        ),
+                ),
+                if (kind == _CollectionKind.playlist || kind == _CollectionKind.all)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: TextButton(
+                      onPressed: () => setState(() {
+                        _editing = !_editing;
+                        // Düzenləmə həqiqi sıra üzərində aparılır
+                        if (_editing) _sort = SongSort.standard;
+                      }),
+                      child: Text(
+                        _editing ? 'Bitti' : 'Düzenle',
+                        style: TextStyle(
+                          color: _editing ? kGreen : kText,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
+                  ),
+              ],
+            ),
+          if (list.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Text(
+                  switch (kind) {
+                    _CollectionKind.liked =>
+                      'Henüz beğendiğin şarkı yok.\nŞarkının yanındaki ⊕ ile beğen.',
+                    _CollectionKind.all => 'Henüz şarkı yok.\n"Ekle" ile dosya seç.',
+                    _CollectionKind.playlist =>
+                      'Bu liste boş.\n"Ekle" ile kitaplığından şarkı seç.',
+                    _CollectionKind.artist ||
+                    _CollectionKind.genre ||
+                    _CollectionKind.album => 'Bu bölümde şarkı yok.',
+                  },
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: kText60),
+                ),
+              ),
+            ),
         ];
 
         // Düzenle rejimində sürüklənən siyahı: çalma listəsi ya da bütün kitaplıq
@@ -322,8 +304,7 @@ class _CollectionPageState extends State<CollectionPage> {
               ),
             ),
             child: SafeArea(
-              child: (_editing &&
-                      (pl != null || kind == _CollectionKind.all))
+              child: (_editing && (pl != null || kind == _CollectionKind.all))
                   ? CustomScrollView(
                       slivers: [
                         SliverList(delegate: SliverChildListDelegate(header)),
@@ -344,9 +325,7 @@ class _CollectionPageState extends State<CollectionPage> {
                               key: ValueKey(s.id),
                               song: s,
                               index: i,
-                              onRemove: pl == null
-                                  ? null
-                                  : () => c.removeFromPlaylist(pl, s),
+                              onRemove: pl == null ? null : () => c.removeFromPlaylist(pl, s),
                             );
                           },
                         ),
@@ -359,11 +338,7 @@ class _CollectionPageState extends State<CollectionPage> {
                       itemBuilder: (context, i) {
                         if (i < header.length) return header[i];
                         final s = list[i - header.length];
-                        return SongTile(
-                            key: ValueKey(s.id),
-                            song: s,
-                            queue: list,
-                            playlist: pl);
+                        return SongTile(key: ValueKey(s.id), song: s, queue: list, playlist: pl);
                       },
                     ),
             ),
@@ -379,12 +354,7 @@ class _EditSongRow extends StatelessWidget {
   final Song song;
   final int index;
   final VoidCallback? onRemove; // null: kitaplıqda çıxarma düyməsi yok
-  const _EditSongRow({
-    super.key,
-    required this.song,
-    required this.index,
-    this.onRemove,
-  });
+  const _EditSongRow({super.key, required this.song, required this.index, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -393,10 +363,12 @@ class _EditSongRow extends StatelessWidget {
       child: ListTile(
         leading: Cover(size: 48, bytes: song.cover),
         title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(song.artist,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: kText60)),
+        subtitle: Text(
+          song.artist,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: kText60),
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -408,10 +380,7 @@ class _EditSongRow extends StatelessWidget {
               ),
             ReorderableDragStartListener(
               index: index,
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(Icons.drag_handle),
-              ),
+              child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.drag_handle)),
             ),
           ],
         ),
@@ -444,16 +413,16 @@ class GroupListPage extends StatelessWidget {
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
-                    Text(byAlbum ? 'Albümler' : 'Sanatçılar',
-                        style: const TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text(
+                      byAlbum ? 'Albümler' : 'Sanatçılar',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
                 Expanded(
                   child: groups.isEmpty
                       ? Center(
-                          child: Text('Henüz kayıt yok',
-                              style: TextStyle(color: kText60)),
+                          child: Text('Henüz kayıt yok', style: TextStyle(color: kText60)),
                         )
                       : ListView.builder(
                           itemCount: groups.length,
@@ -473,31 +442,35 @@ class GroupListPage extends StatelessWidget {
                                                 color: Colors.grey.shade800,
                                                 child: const Icon(Icons.person),
                                               )
-                                            : Image.memory(art,
+                                            : Image.memory(
+                                                art,
                                                 fit: BoxFit.cover,
                                                 cacheWidth: 168,
-                                                gaplessPlayback: true),
+                                                gaplessPlayback: true,
+                                              ),
                                       ),
                                     ),
-                              title: Text(g.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
+                              title: Text(
+                                g.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
                               subtitle: Text(
-                                  byAlbum
-                                      ? '${g.songs.first.artist} • ${countAndTotal(g.songs)}'
-                                      : countAndTotal(g.songs),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: kText60, fontSize: 13)),
-                              onTap: () => Navigator.of(context)
-                                  .push(MaterialPageRoute(
-                                builder: (_) => byAlbum
-                                    ? CollectionPage.album(g.name)
-                                    : CollectionPage.artist(g.name),
-                              )),
+                                byAlbum
+                                    ? '${g.songs.first.artist} • ${countAndTotal(g.songs)}'
+                                    : countAndTotal(g.songs),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: kText60, fontSize: 13),
+                              ),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => byAlbum
+                                      ? CollectionPage.album(g.name)
+                                      : CollectionPage.artist(g.name),
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -515,8 +488,7 @@ class _ActionPill extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _ActionPill(
-      {required this.icon, required this.label, required this.onTap});
+  const _ActionPill({required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -525,10 +497,7 @@ class _ActionPill extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: kText12,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: BoxDecoration(color: kText12, borderRadius: BorderRadius.circular(20)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -543,8 +512,7 @@ class _ActionPill extends StatelessWidget {
 }
 
 // ================= Menüler ve diyaloglar =================
-Future<String?> askText(BuildContext context,
-    {required String title, String initial = ''}) {
+Future<String?> askText(BuildContext context, {required String title, String initial = ''}) {
   final ctrl = TextEditingController(text: initial);
   return showDialog<String>(
     context: context,
@@ -557,10 +525,7 @@ Future<String?> askText(BuildContext context,
         onSubmitted: (v) => Navigator.pop(ctx, v),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('İptal'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
         TextButton(
           onPressed: () => Navigator.pop(ctx, ctrl.text),
           child: Text('Tamam', style: TextStyle(color: kGreen)),
@@ -570,6 +535,5 @@ Future<String?> askText(BuildContext context,
   );
 }
 
-ShapeBorder get _sheetShape => const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    );
+ShapeBorder get _sheetShape =>
+    const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16)));

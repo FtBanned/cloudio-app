@@ -6,11 +6,7 @@ import 'package:flutter/painting.dart' show HSVColor;
 /// Kapağı 16x16'ya küçültüp ortalama rengini bulur. Okunamazsa null döner.
 Future<ui.Color?> coverTint(Uint8List bytes) async {
   try {
-    final codec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth: 16,
-      targetHeight: 16,
-    );
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 16, targetHeight: 16);
     final frame = await codec.getNextFrame();
     final data = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (data == null) return null;
@@ -69,11 +65,7 @@ Future<CoverPalette?> coverPalette(Uint8List bytes) async {
   final cached = _paletteCache[bytes];
   if (cached != null) return cached;
   try {
-    final codec = await ui.instantiateImageCodec(
-      bytes,
-      targetWidth: 32,
-      targetHeight: 32,
-    );
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 32, targetHeight: 32);
     final frame = await codec.getNextFrame();
     final data = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
     frame.image.dispose();
@@ -109,7 +101,11 @@ Future<CoverPalette?> coverPalette(Uint8List bytes) async {
       if (w[i] > w[best]) best = i;
     }
     ui.Color binColor(int i) => ui.Color.fromARGB(
-        255, (rs[i] / w[i]).round(), (gs[i] / w[i]).round(), (bs[i] / w[i]).round());
+      255,
+      (rs[i] / w[i]).round(),
+      (gs[i] / w[i]).round(),
+      (bs[i] / w[i]).round(),
+    );
 
     CoverPalette pal;
     if (w[best] < 0.5) {

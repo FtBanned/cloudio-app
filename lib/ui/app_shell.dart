@@ -12,12 +12,8 @@ class CloudioApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.instance.themeData,
         // "Sırada" kartı bütün ekranların (Now Playing daxil) üstündə göstərilir
-        builder: (context, child) => Stack(
-          children: [
-            child ?? const SizedBox.shrink(),
-            const _UpNextOverlay(),
-          ],
-        ),
+        builder: (context, child) =>
+            Stack(children: [child ?? const SizedBox.shrink(), const _UpNextOverlay()]),
         home: const MainShell(),
       ),
     );
@@ -64,13 +60,13 @@ class _UpNextOverlay extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: const Color(0xFF282828),
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                  color: kGreen.withValues(alpha: 0.5)),
+                              border: Border.all(color: kGreen.withValues(alpha: 0.5)),
                               boxShadow: const [
                                 BoxShadow(
-                                    color: Colors.black54,
-                                    blurRadius: 16,
-                                    offset: Offset(0, 6)),
+                                  color: Colors.black54,
+                                  blurRadius: 16,
+                                  offset: Offset(0, 6),
+                                ),
                               ],
                             ),
                             child: Row(
@@ -79,33 +75,35 @@ class _UpNextOverlay extends StatelessWidget {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('SIRADA',
-                                          style: TextStyle(
-                                              color: kGreen,
-                                              fontSize: 10,
-                                              letterSpacing: 1,
-                                              fontWeight: FontWeight.bold)),
-                                      Text(song.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w600)),
-                                      Text(song.artist,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              color: Colors.white60,
-                                              fontSize: 12)),
+                                      Text(
+                                        'SIRADA',
+                                        style: TextStyle(
+                                          color: kGreen,
+                                          fontSize: 10,
+                                          letterSpacing: 1,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        song.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                      Text(
+                                        song.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white60, fontSize: 12),
+                                      ),
                                     ],
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close,
-                                      size: 20, color: Colors.white54),
+                                  icon: const Icon(Icons.close, size: 20, color: Colors.white54),
                                   onPressed: c.dismissUpNext,
                                 ),
                               ],
@@ -168,10 +166,11 @@ class _MainShellState extends State<MainShell> {
 
   Future<void> _createPlaylist() async {
     setState(() => _createOpen = false);
-    final name = await askText(context,
-        title: 'Çalma listesine ad ver',
-        initial:
-            'Çalma listem #${PlayerController.instance.playlists.length + 1}');
+    final name = await askText(
+      context,
+      title: 'Çalma listesine ad ver',
+      initial: 'Çalma listem #${PlayerController.instance.playlists.length + 1}',
+    );
     if (name == null || !mounted) return;
     final pl = PlayerController.instance.createPlaylist(name);
     openPlaylist(context, pl);
@@ -316,11 +315,7 @@ class _NavItem extends StatelessWidget {
               opacity: hideLabel ? 0 : 1,
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: color,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: color),
               ),
             ),
           ],
@@ -342,19 +337,14 @@ class _CreateButton extends StatelessWidget {
       curve: Curves.easeOutCubic,
       width: 44,
       height: 44,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: open ? kText : Colors.transparent,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: open ? kText : Colors.transparent),
       child: AnimatedRotation(
         turns: open ? 0.125 : 0, // 45°: "+" → "×"
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutBack,
         child: TweenAnimationBuilder<Color?>(
           duration: const Duration(milliseconds: 300),
-          tween: ColorTween(
-            end: open ? kBg : const Color(0xFFB3B3B3),
-          ),
+          tween: ColorTween(end: open ? kBg : const Color(0xFFB3B3B3)),
           builder: (_, c, _) => Icon(Icons.add, size: 30, color: c),
         ),
       ),
@@ -403,17 +393,17 @@ class _CreateOverlay extends StatelessWidget {
                   child: Material(
                     type: MaterialType.transparency,
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       leading: CircleAvatar(
                         radius: 28,
                         backgroundColor: kText12,
                         child: Icon(Icons.music_note),
                       ),
-                      title: const Text('Çalma Listesi',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle:
-                          const Text('Şarkı içeren bir çalma listesi oluştur'),
+                      title: const Text(
+                        'Çalma Listesi',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text('Şarkı içeren bir çalma listesi oluştur'),
                       onTap: onCreatePlaylist,
                     ),
                   ),
@@ -439,9 +429,7 @@ class _LibraryIcon extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _LibraryIconPainter(theme.color ?? Colors.white, filled),
-      ),
+      child: CustomPaint(painter: _LibraryIconPainter(theme.color ?? Colors.white, filled)),
     );
   }
 }
@@ -469,14 +457,10 @@ class _LibraryIconPainter extends CustomPainter {
     canvas.save();
     canvas.translate(17, 12);
     canvas.rotate(-0.2);
-    canvas.drawRRect(
-      bar(-3 + i, -8 + i, 6 - 2 * i, 16 - 2 * i),
-      paint,
-    );
+    canvas.drawRRect(bar(-3 + i, -8 + i, 6 - 2 * i, 16 - 2 * i), paint);
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_LibraryIconPainter old) =>
-      old.color != color || old.filled != filled;
+  bool shouldRepaint(_LibraryIconPainter old) => old.color != color || old.filled != filled;
 }

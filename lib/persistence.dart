@@ -189,13 +189,12 @@ class CloudioStore {
 
   // ---- söz <-> JSON ----
   static Map<String, Object?> _lyricsToMap(Lyrics l) => <String, Object?>{
-        's': l.synced,
-        'src': l.source,
-        'l': [
-          for (final line in l.lines)
-            <Object?>[line.time?.inMilliseconds ?? -1, line.text],
-        ],
-      };
+    's': l.synced,
+    'src': l.source,
+    'l': [
+      for (final line in l.lines) <Object?>[line.time?.inMilliseconds ?? -1, line.text],
+    ],
+  };
 
   static Lyrics? _lyricsFromMap(Object? raw) {
     try {
@@ -204,10 +203,7 @@ class CloudioStore {
       for (final e in (raw['l'] as List)) {
         final row = e as List;
         final ms = row[0] as int;
-        lines.add(LyricLine(
-          ms < 0 ? null : Duration(milliseconds: ms),
-          row[1] as String,
-        ));
+        lines.add(LyricLine(ms < 0 ? null : Duration(milliseconds: ms), row[1] as String));
       }
       return Lyrics(
         lines,
@@ -253,30 +249,32 @@ class CloudioStore {
             lyr = _lyricsFromMap(m['lyrics']);
             lyrNotFound = m['lyricsNotFound'] as bool? ?? false;
           }
-          result.add(SavedSong(
-            id: id,
-            seq: m['seq'] as int? ?? 0,
-            title: m['title'] as String? ?? '',
-            artist: m['artist'] as String? ?? '',
-            album: m['album'] as String? ?? '',
-            ext: m['ext'] as String? ?? '',
-            liked: m['liked'] as bool? ?? false,
-            coverStatus: m['coverStatus'] as int? ?? 0,
-            cover: coverB64 == null ? null : base64Decode(coverB64),
-            lyrics: lyr,
-            lyricsNotFound: lyrNotFound,
-            file: m['file'] as String?,
-            durationMs: m['dur'] as int?,
-            playCount: m['plays'] as int? ?? 0,
-            lastPlayedMs: m['last'] as int? ?? 0,
-            gainDb: (m['gain'] as num?)?.toDouble(),
-            gainTried: m['gt'] as bool? ?? false,
-            genre: m['genre'] as String? ?? '',
-            year: m['year'] as int? ?? 0,
-            trackNo: m['trk'] as int? ?? 0,
-            discNo: m['disc'] as int? ?? 0,
-            tagsTried: m['tt'] as bool? ?? false,
-          ));
+          result.add(
+            SavedSong(
+              id: id,
+              seq: m['seq'] as int? ?? 0,
+              title: m['title'] as String? ?? '',
+              artist: m['artist'] as String? ?? '',
+              album: m['album'] as String? ?? '',
+              ext: m['ext'] as String? ?? '',
+              liked: m['liked'] as bool? ?? false,
+              coverStatus: m['coverStatus'] as int? ?? 0,
+              cover: coverB64 == null ? null : base64Decode(coverB64),
+              lyrics: lyr,
+              lyricsNotFound: lyrNotFound,
+              file: m['file'] as String?,
+              durationMs: m['dur'] as int?,
+              playCount: m['plays'] as int? ?? 0,
+              lastPlayedMs: m['last'] as int? ?? 0,
+              gainDb: (m['gain'] as num?)?.toDouble(),
+              gainTried: m['gt'] as bool? ?? false,
+              genre: m['genre'] as String? ?? '',
+              year: m['year'] as int? ?? 0,
+              trackNo: m['trk'] as int? ?? 0,
+              discNo: m['disc'] as int? ?? 0,
+              tagsTried: m['tt'] as bool? ?? false,
+            ),
+          );
         } catch (e) {
           debugPrint('[Cloudio DB] bir mahnı oxunmadı (${snap.key}): $e');
         }
@@ -288,14 +286,14 @@ class CloudioStore {
       if (plRec != null) {
         for (final p in (plRec['list'] as List? ?? const [])) {
           final pm = p as Map;
-          playlists.add(SavedPlaylist(
-            pm['name'] as String? ?? '',
-            [for (final id in (pm['ids'] as List? ?? const [])) id as String],
-          ));
+          playlists.add(
+            SavedPlaylist(pm['name'] as String? ?? '', [
+              for (final id in (pm['ids'] as List? ?? const [])) id as String,
+            ]),
+          );
         }
       }
-      debugPrint(
-          '[Cloudio DB] yükləndi: ${result.length} mahnı, ${playlists.length} siyahı');
+      debugPrint('[Cloudio DB] yükləndi: ${result.length} mahnı, ${playlists.length} siyahı');
       return SavedLibrary(result, playlists);
     } catch (e, st) {
       debugPrint('[Cloudio DB] oxuma xətası: $e');
@@ -387,8 +385,7 @@ class CloudioStore {
 
   /// Bir şarkının sözünü (ya da "bulunamadı" işaretini) küçük ayrı kayıtta saklar.
   /// Yazılamazsa kısa bir beklemeyle bir kez daha dener. Başarılıysa true döner.
-  Future<bool> saveLyrics(String id, Lyrics? lyrics,
-      {required bool notFound}) async {
+  Future<bool> saveLyrics(String id, Lyrics? lyrics, {required bool notFound}) async {
     final db = _db;
     if (db == null) return false;
     for (var attempt = 0; attempt < 2; attempt++) {
@@ -504,9 +501,7 @@ class CloudioStore {
     final db = _db;
     if (db == null) return;
     try {
-      await _meta
-          .record('position')
-          .put(db, <String, Object?>{'id': id, 'ms': ms});
+      await _meta.record('position').put(db, <String, Object?>{'id': id, 'ms': ms});
     } catch (e) {
       debugPrint('[Cloudio DB] mövqe yazıla bilmədi: $e');
     }
@@ -551,7 +546,7 @@ class CloudioStore {
   }
 
   Future<({double crossfade, bool normalize, int coverVersion, double speed, bool dynamicBg})?>
-      loadSettings() async {
+  loadSettings() async {
     final db = _db;
     if (db == null) return null;
     try {
@@ -658,16 +653,20 @@ class CloudioStore {
   }
 
   /// Təkrar mahnı birləşdirilərkən: [fromId]-yə aid bütün dinləmə qeydlərini [toId]-yə köçürür.
-  Future<void> reassignPlays(String fromId, String toId,
-      {required String title, required String artist}) async {
+  Future<void> reassignPlays(
+    String fromId,
+    String toId, {
+    required String title,
+    required String artist,
+  }) async {
     final db = _db;
     if (db == null) return;
     try {
-      await _plays.update(
-        db,
-        <String, Object?>{'id': toId, 't': title, 'a': artist},
-        finder: Finder(filter: Filter.equals('id', fromId)),
-      );
+      await _plays.update(db, <String, Object?>{
+        'id': toId,
+        't': title,
+        'a': artist,
+      }, finder: Finder(filter: Filter.equals('id', fromId)));
     } catch (e) {
       debugPrint('[Cloudio DB] dinləmə qeydləri köçürülmədi: $e');
     }
@@ -682,14 +681,16 @@ class CloudioStore {
       for (final snap in snaps) {
         try {
           final m = snap.value;
-          out.add(PlayEvent(
-            ts: m['ts'] as int? ?? 0,
-            songId: m['id'] as String? ?? '',
-            title: m['t'] as String? ?? '',
-            artist: m['a'] as String? ?? '',
-            genre: m['g'] as String? ?? '',
-            durMs: m['d'] as int? ?? 0,
-          ));
+          out.add(
+            PlayEvent(
+              ts: m['ts'] as int? ?? 0,
+              songId: m['id'] as String? ?? '',
+              title: m['t'] as String? ?? '',
+              artist: m['a'] as String? ?? '',
+              genre: m['g'] as String? ?? '',
+              durMs: m['d'] as int? ?? 0,
+            ),
+          );
         } catch (_) {}
       }
       out.sort((a, b) => a.ts.compareTo(b.ts));
@@ -705,9 +706,7 @@ class CloudioStore {
     final db = _db;
     if (db == null) return;
     try {
-      await _meta
-          .record('theme')
-          .put(db, <String, Object?>{'mode': mode, 'accent': accent});
+      await _meta.record('theme').put(db, <String, Object?>{'mode': mode, 'accent': accent});
     } catch (e) {
       debugPrint('[Cloudio DB] tema yazıla bilmədi: $e');
     }
@@ -727,11 +726,7 @@ class CloudioStore {
   }
 
   // ---- yerli profil (ad, rəng, yaradılma tarixi) ----
-  Future<void> saveProfile({
-    required String name,
-    required int color,
-    required int sinceMs,
-  }) async {
+  Future<void> saveProfile({required String name, required int color, required int sinceMs}) async {
     final db = _db;
     if (db == null) return;
     try {
