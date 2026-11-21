@@ -94,8 +94,24 @@ class SoloudPlayer {
   // ---- yükləmə ----
   /// Telefonda: fayl yolundan. Diskdən axın rejimi: bütün mahnını PCM-ə açıb RAM-ı doldurmur.
   Future<Duration?> setFilePath(String path, {Duration? initialPosition}) {
+    final p = path.toLowerCase();
+    final native = p.endsWith('.m4a') || p.endsWith('.aac') || p.endsWith('.mp4');
     return _load(
-      () => SoLoud.instance.loadFile(path, mode: LoadMode.disk),
+      () async {
+        if (!native) return SoLoud.instance.loadFile(path, mode: LoadMode.disk);
+        // m4a/aac (telefonun öz dekoderi): əvvəl disk rejimi; alınmazsa və ya
+        // uzunluq 0 çıxarsa yaddaş rejimi ilə yenidən yoxlanır.
+        try {
+          final s = await SoLoud.instance.loadFile(path, mode: LoadMode.disk);
+          if (SoLoud.instance.getLength(s) > Duration.zero) return s;
+          try {
+            await SoLoud.instance.disposeSource(s);
+          } catch (_) {}
+        } catch (e) {
+          debugPrint('[Cloudio] m4a/aac disk rejimi alınmadı, yaddaş rejimi: $e');
+        }
+        return SoLoud.instance.loadFile(path, mode: LoadMode.memory);
+      },
       initialPosition,
     );
   }

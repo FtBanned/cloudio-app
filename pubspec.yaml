@@ -37,8 +37,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   file_picker: ^13.4.0
   just_audio: ^0.10.6 # yalnız ProcessingState enum-u üçün qalır
-  # DİQQƏT: "^" YOXDUR, dəqiq versiya (sinaq 5.0.2 ilə sınaqdan keçib)
-  flutter_soloud: 5.0.2
+  # DİQQƏT: "^" YOXDUR, dəqiq versiya. m4a/aac dəstəyi 5.2.0-dan başlayır (5.0.2-də yox idi)
+  flutter_soloud: 5.2.3
   web: ^1.1.2
   http: ^1.6.0
   sembast: ^3.10.1
