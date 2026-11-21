@@ -19,6 +19,7 @@ import 'main.dart'
 import 'backup_page.dart';
 import 'booster.dart';
 import 'booster_page.dart';
+import 'duplicates_page.dart';
 import 'onboarding.dart';
 import 'player_controller.dart';
 import 'stats_page.dart';
@@ -175,6 +176,15 @@ class SettingsPage extends StatelessWidget {
                       ? 'Toplam süre henüz bilinmiyor'
                       : 'Toplam süre: ${formatTotal(c.songs)}',
                   style: TextStyle(color: kText54, fontSize: 12)),
+            ),
+            ListTile(
+              leading: Icon(Icons.copy_all_outlined, color: kGreen),
+              title: const Text('Tekrar eden şarkıları bul'),
+              subtitle: Text(
+                  'Aynı şarkının farklı formatlardaki kopyalarını yakalar',
+                  style: TextStyle(color: kText54, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right, color: kText38),
+              onTap: () => openDuplicates(context),
             ),
             if (!kIsWeb)
               ListTile(

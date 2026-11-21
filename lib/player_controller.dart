@@ -1389,6 +1389,57 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// Təkrar mahnı: [remove]-u silir, əvvəl izini [keep]-ə köçürür
+  /// (çalma siyahıları, bəyənmə, dinləmə sayı, çatışan kapak/söz/etiketlər).
+  Future<void> mergeDuplicate(Song keep, Song remove) async {
+    if (identical(keep, remove)) return;
+    for (final p in playlists) {
+      final i = p.songs.indexOf(remove);
+      if (i < 0) continue;
+      if (p.songs.contains(keep)) {
+        p.songs.removeAt(i);
+      } else {
+        p.songs[i] = keep; // siyahıdakı yeri qalır
+      }
+    }
+    if (remove.liked) keep.liked = true;
+    keep.playCount += remove.playCount;
+    if (remove.lastPlayedMs > keep.lastPlayedMs) {
+      keep.lastPlayedMs = remove.lastPlayedMs;
+    }
+    if (keep.cover == null && remove.cover != null) {
+      keep.cover = remove.cover;
+      keep.tint = remove.tint;
+      keep.coverStatus = CoverStatus.found;
+    }
+    if (keep.lyrics == null && remove.lyrics != null) {
+      keep.lyrics = remove.lyrics;
+      keep.lyricsStatus = LyricsStatus.found;
+      _saveLyrics(keep);
+    }
+    if (keep.genre.isEmpty) keep.genre = remove.genre;
+    if (keep.year == 0) keep.year = remove.year;
+    if (keep.trackNo == 0) keep.trackNo = remove.trackNo;
+    if (keep.discNo == 0) keep.discNo = remove.discNo;
+    await _saveSong(keep);
+    // statistika tarixçəsi: silinənin dinləmələri qalan mahnının adına keçir
+    for (var i = 0; i < playLog.length; i++) {
+      final e = playLog[i];
+      if (e.songId != remove.id) continue;
+      playLog[i] = PlayEvent(
+        ts: e.ts,
+        songId: keep.id,
+        title: keep.title,
+        artist: keep.artist,
+        genre: e.genre.isEmpty ? keep.genre : e.genre,
+        durMs: e.durMs,
+      );
+    }
+    await CloudioStore.instance
+        .reassignPlays(remove.id, keep.id, title: keep.title, artist: keep.artist);
+    await removeSong(remove); // siyahıları, növbəni və səs faylını da təmizləyir
+  }
+
   Future<void> addSongs() async {
     // iPhone Safari-də FileType.audio mahnıları solğun göstərirdi, ona görə hamısını
     // göstərib uzantını özümüz yoxlayırıq (aşağıda).

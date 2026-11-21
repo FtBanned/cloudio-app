@@ -658,6 +658,22 @@ class CloudioStore {
     }
   }
 
+  /// Təkrar mahnı birləşdirilərkən: [fromId]-yə aid bütün dinləmə qeydlərini [toId]-yə köçürür.
+  Future<void> reassignPlays(String fromId, String toId,
+      {required String title, required String artist}) async {
+    final db = _db;
+    if (db == null) return;
+    try {
+      await _plays.update(
+        db,
+        <String, Object?>{'id': toId, 't': title, 'a': artist},
+        finder: Finder(filter: Filter.equals('id', fromId)),
+      );
+    } catch (e) {
+      debugPrint('[Cloudio DB] dinləmə qeydləri köçürülmədi: $e');
+    }
+  }
+
   Future<List<PlayEvent>> loadPlays() async {
     final db = _db;
     if (db == null) return const [];
