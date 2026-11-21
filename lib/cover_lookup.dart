@@ -27,8 +27,12 @@ class CoverHit {
 
   /// true: dosya adı "Şarkı - Sanatçı" sırasıyla yazılmıştı (ad ve sanatçı yer değiştirmiş).
   final bool swapped;
+
+  /// true: "yakın sonuç" son çaresiyle bulundu; elle seçimdeki gibi ad, sanatçı ve albüm de
+  /// bulunan sonuca göre doldurulur.
+  final bool forceInfo;
   const CoverHit(this.bytes, this.title, this.artist, this.album, this.source,
-      {this.swapped = false, this.score = 0});
+      {this.swapped = false, this.score = 0, this.forceInfo = false});
 }
 
 class _Cand {
@@ -166,6 +170,13 @@ Future<CoverHit?> findCover({
     } catch (e) {
       debugPrint('[Kapak] ehtiyat axtarış xətası: $e');
     }
+    // Yumşaq ehtiyat da tapmadı: "İnternette ara"da çıkan ən güclü yaxın nəticəni götür.
+    try {
+      final be = await _bestEffortCover(title: title, artist: artist);
+      if (be != null) return be;
+    } catch (e) {
+      debugPrint('[Kapak] yakın sonuç xətası: $e');
+    }
   }
   if (reached == 0 && lastError != null) throw Exception(lastError);
   return null;
@@ -230,6 +241,71 @@ Future<CoverHit?> _fallbackCover({
     }
   }
   return null;
+}
+
+/// Son çare: "Şarkı bilgilerini düzenle > İnternette ara" ekranındaki aramanın aynısını
+/// ("sanatçı ad") yapar, sonuçlardan girişe EN YAKIN olanı seçer ve uygular.
+/// Çok zayıf eşleşmeler (ortak sözcük yok) yine de reddedilir; yanlış seçilirse kullanıcı
+/// düzenleme ekranından elle düzeltir.
+Future<CoverHit?> _bestEffortCover({
+  required String title,
+  required String artist,
+}) async {
+  final rawT = tidyName(title);
+  final rawA = artist.isEmpty ? '' : tidyName(artist);
+  final q = cleanForSearch('$rawA $rawT'.trim());
+  final qTok = _tokens('$rawA $rawT');
+  if (q.isEmpty || qTok.isEmpty) return null;
+
+  final all = <_Cand>[];
+  final seen = <String>{};
+  for (final fetch in <Future<List<_Cand>> Function()>[
+    () => _deezer(q, limit: 15),
+    () => _itunes(q, 'tr', limit: 12),
+    () => _itunes(q, 'us', limit: 8),
+  ]) {
+    try {
+      for (final c in await fetch()) {
+        if (c.arts.isEmpty) continue;
+        if (seen.add(_norm('${c.artist} ${c.title} ${c.album}'))) all.add(c);
+      }
+    } catch (e) {
+      debugPrint('[Kapak] yakın sonuç "$q" HATA: $e');
+    }
+  }
+
+  // Eşit puanda sıradaki (kaynağın kendi alaka sırası) öne geçsin
+  final scored = <(double, _Cand)>[];
+  for (var i = 0; i < all.length; i++) {
+    final sc = _bestEffortScore(all[i], qTok);
+    if (sc > 0) scored.add((sc - i * 0.002, all[i]));
+  }
+  scored.sort((x, y) => y.$1.compareTo(x.$1));
+  debugPrint('[Kapak] yakın sonuç "$q": ${all.length} sonuç, ${scored.length} uygun');
+  for (final (score, c) in scored.take(5)) {
+    for (final url in c.arts) {
+      final img = await _getImage(url);
+      if (img != null) {
+        debugPrint(
+            '[Kapak] yakın sonuç "$q": SEÇİLDİ (${score.toStringAsFixed(2)}, ${c.artist} - ${c.title})');
+        return CoverHit(img, c.title, c.artist, c.album, 'yakin-sonuc',
+            score: score, forceInfo: true);
+      }
+    }
+  }
+  return null;
+}
+
+/// 0 = uygun değil. Girişteki sözcüklerin adayda (başlık+sanatçı+albüm) bulunması ve
+/// adayın başlığının girişte bulunması gerekir (sıra ve ad/sanatçı yeri fark etmez).
+double _bestEffortScore(_Cand c, List<String> qTok) {
+  final ct = _tokens(c.title);
+  if (ct.isEmpty || qTok.isEmpty) return 0;
+  final all = [...ct, ..._tokens(c.artist), ..._tokens(c.album)];
+  final qIn = _coverage(qTok, all); // giriş adayda var mı
+  final cIn = _coverage(ct, qTok); // adayın başlığı girişte var mı
+  if (cIn < 0.5 || qIn < 0.5) return 0;
+  return 0.6 * qIn + 0.4 * cIn;
 }
 
 /// Yumşaq uyğunluq: adayın başlığı girişdə (ad+sənətçi sözləri birlikdə) olmalı, giriş
@@ -435,6 +511,57 @@ Future<MetaHit?> findMeta({
         lastError = e;
         debugPrint('[Bilgi] "$q" · $name HATA: $e');
       }
+    }
+  }
+  // Sərt yoxlama hamısını tapmadısa: "yakın sonuç" son çaresi (eksik alanları doldurur)
+  if (!done() && reached > 0) {
+    try {
+      final rawT = tidyName(title);
+      final rawA = artist.isEmpty ? '' : tidyName(artist);
+      final q = cleanForSearch('$rawA $rawT'.trim());
+      final qTok = _tokens('$rawA $rawT');
+      if (q.isNotEmpty && qTok.isNotEmpty) {
+        final all = <_MetaCand>[];
+        for (final search in <Future<List<_MetaCand>> Function()>[
+          () => _deezerMeta(q),
+          () => _itunesMeta(q, 'tr'),
+          () => _itunesMeta(q, 'us'),
+        ]) {
+          try {
+            all.addAll(await search());
+          } catch (e) {
+            debugPrint('[Bilgi] yakın sonuç "$q" HATA: $e');
+          }
+        }
+        final scored = <(double, _MetaCand)>[];
+        for (var i = 0; i < all.length; i++) {
+          final sc = _bestEffortScore(all[i].base, qTok);
+          if (sc > 0) scored.add((sc - i * 0.002, all[i]));
+        }
+        scored.sort((x, y) => y.$1.compareTo(x.$1));
+        for (final (_, m) in scored.take(2)) {
+          if (done()) break;
+          await m.resolve();
+          var got = false;
+          if (needGenre && genre.isEmpty && m.genre.isNotEmpty) {
+            genre = m.genre;
+            got = true;
+          }
+          if (needYear && year == 0 && m.year > 0) {
+            year = m.year;
+            got = true;
+          }
+          if (needTrack && trackNo == 0 && m.trackNo > 0) {
+            trackNo = m.trackNo;
+            discNo = m.discNo;
+            got = true;
+          }
+          debugPrint('[Bilgi] yakın sonuç "$q": ${got ? 'BULUNDU' : 'alan yok'}');
+          if (got) src = src.isEmpty ? 'yakin-sonuc' : '$src+yakin-sonuc';
+        }
+      }
+    } catch (e) {
+      debugPrint('[Bilgi] yakın sonuç xətası: $e');
     }
   }
   if (reached == 0 && lastError != null) throw Exception(lastError);
