@@ -579,8 +579,18 @@ class _CoverLyricLineState extends State<_CoverLyricLine> {
   }
 }
 
-class SeekBar extends StatelessWidget {
+class SeekBar extends StatefulWidget {
   const SeekBar({super.key});
+
+  @override
+  State<SeekBar> createState() => _SeekBarState();
+}
+
+class _SeekBarState extends State<SeekBar> {
+  /// Sürüşdürmə zamanı yalnız bu dəyər dəyişir; real seek barmaq qalxanda edilir.
+  /// (Əvvəl hər onChanged-də seek edilirdi: diskdən oxunan MP3-də saniyədə onlarla
+  /// seek donmaya səbəb olurdu.)
+  double? _dragMs;
 
   @override
   Widget build(BuildContext context) {
@@ -588,10 +598,12 @@ class SeekBar extends StatelessWidget {
     return StreamBuilder<Duration>(
       stream: c.positionStream,
       builder: (context, snap) {
-        final pos = snap.data ?? Duration.zero;
         final dur = c.player.duration ?? Duration.zero;
         final maxMs = dur.inMilliseconds;
-        final posMs = pos.inMilliseconds.clamp(0, maxMs <= 0 ? 0 : maxMs);
+        final upper = maxMs <= 0 ? 0 : maxMs;
+        final posMs = _dragMs?.round() ??
+            (snap.data ?? Duration.zero).inMilliseconds.clamp(0, upper);
+        final pos = Duration(milliseconds: posMs);
 
         return Column(
           children: [
@@ -606,10 +618,15 @@ class SeekBar extends StatelessWidget {
                 thumbColor: Colors.white,
               ),
               child: Slider(
-                value: posMs.toDouble(),
+                value: posMs.clamp(0, maxMs <= 0 ? 1 : maxMs).toDouble(),
                 min: 0,
                 max: maxMs <= 0 ? 1 : maxMs.toDouble(),
-                onChanged: (v) => c.seek(Duration(milliseconds: v.toInt())),
+                onChangeStart: (v) => setState(() => _dragMs = v),
+                onChanged: (v) => setState(() => _dragMs = v),
+                onChangeEnd: (v) async {
+                  await c.seek(Duration(milliseconds: v.toInt()));
+                  if (mounted) setState(() => _dragMs = null);
+                },
               ),
             ),
             Padding(

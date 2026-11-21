@@ -69,7 +69,9 @@ class SoloudPlayer {
         if (SoLoud.instance.getIsValidVoiceHandle(h)) {
           return SoLoud.instance.getPosition(h);
         }
-      } catch (_) {}
+      } catch (e) {
+        audioLog('position oxunmadı', e);
+      }
     }
     return _lastPos;
   }
@@ -79,7 +81,8 @@ class SoloudPlayer {
     if (h == null) return false;
     try {
       return SoLoud.instance.getIsValidVoiceHandle(h);
-    } catch (_) {
+    } catch (e) {
+      audioLog('getIsValidVoiceHandle', e);
       return false;
     }
   }
@@ -106,7 +109,9 @@ class SoloudPlayer {
           if (SoLoud.instance.getLength(s) > Duration.zero) return s;
           try {
             await SoLoud.instance.disposeSource(s);
-          } catch (_) {}
+          } catch (e) {
+            audioLog('m4a: ilkin mənbə dispose olunmadı', e);
+          }
         } catch (e) {
           debugPrint('[Cloudio] m4a/aac disk rejimi alınmadı, yaddaş rejimi: $e');
         }
@@ -140,7 +145,9 @@ class SoloudPlayer {
     if (seq != _loadSeq || _disposed) {
       try {
         await SoLoud.instance.disposeSource(src);
-      } catch (_) {}
+      } catch (e) {
+        audioLog('yarımçıq yükləmənin mənbəyi dispose olunmadı', e);
+      }
       throw Exception('Loading interrupted');
     }
     _src = src;
@@ -171,12 +178,16 @@ class SoloudPlayer {
     if (h != null) {
       try {
         await SoLoud.instance.stop(h);
-      } catch (_) {}
+      } catch (e) {
+        audioLog('stop (handle) xətası', e);
+      }
     }
     if (s != null) {
       try {
         await SoLoud.instance.disposeSource(s);
-      } catch (_) {}
+      } catch (e) {
+        audioLog('mənbə dispose olunmadı', e);
+      }
     }
   }
 
@@ -251,14 +262,18 @@ class SoloudPlayer {
     _vol = v.clamp(0.0, 1.0).toDouble();
     try {
       if (_handleValid) SoLoud.instance.setVolume(_h!, _vol);
-    } catch (_) {}
+    } catch (e) {
+      audioLog('setVolume', e);
+    }
   }
 
   Future<void> setSpeed(double v) async {
     _speed = v;
     try {
       if (_handleValid) SoLoud.instance.setRelativePlaySpeed(_h!, v);
-    } catch (_) {}
+    } catch (e) {
+      audioLog('setRelativePlaySpeed', e);
+    }
     SoloudEngine.instance.setSpeed(v);
   }
 
@@ -292,6 +307,8 @@ class SoloudPlayer {
         _lastPos = SoLoud.instance.getPosition(h);
         _posCtl.add(_lastPos);
       }
-    } catch (_) {}
+    } catch (e) {
+      audioLog('_tick (mövqe/handle oxunmadı)', e);
+    }
   }
 }

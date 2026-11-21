@@ -1,6 +1,17 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_soloud/flutter_soloud.dart';
 
+String? _lastAudioLog;
+
+/// Audio xətalarını loga yazır. Eyni xəta ardıcıl təkrarlananda (məs. _tick saniyədə 5 dəfə
+/// işləyir) log doldurmasın deyə təkrar mesajlar buraxılır.
+void audioLog(String where, Object error) {
+  final msg = '[Cloudio] $where: $error';
+  if (msg == _lastAudioLog) return;
+  _lastAudioLog = msg;
+  debugPrint(msg);
+}
+
 /// SoLoud ses mühərrikinin tək nöqtəli idarəsi: başlatma + qlobal effekt zənciri.
 ///
 /// Zəncir (sıra vacibdir): [pitch düzəldici] -> EQ -> kompressor (+makeup) -> limiter.
@@ -72,7 +83,9 @@ class SoloudEngine {
     if (!ready || !_fxActive) return;
     try {
       SoLoud.instance.filters.compressorFilter.makeupGain.value = db;
-    } catch (_) {}
+    } catch (e) {
+      audioLog('setMakeup', e);
+    }
   }
 
   void _sync() {
