@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'main.dart' show Cover, kCard, kGreen, kText, kText38, kText54, kText60;
 import 'persistence.dart' show PlayEvent;

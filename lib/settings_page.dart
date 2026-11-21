@@ -1,6 +1,6 @@
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:video_player/video_player.dart';
 
 import 'app_theme.dart';
@@ -732,7 +732,7 @@ class _AdminBackdropState extends State<_AdminBackdrop>
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Başka bir sayfa bu sayfanın üstünü kapatınca TickerMode kapanır.
-    _pageVisible = TickerMode.of(context);
+    _pageVisible = TickerMode.valuesOf(context).enabled;
     _syncPlayback();
   }
 

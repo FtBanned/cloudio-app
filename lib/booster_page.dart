@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'booster.dart';
 import 'main.dart' show kBg, kCard, kGreen, kText, kText38, kText54;

@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'backup_stub.dart' if (dart.library.io) 'backup_io.dart' show backupFileSize;
@@ -165,6 +165,7 @@ class BackupPage extends StatelessWidget {
         return c.prepareBackup();
       });
     } catch (e) {
+      if (!context.mounted) return;
       _snack(context, _err(e));
       return;
     }
@@ -232,6 +233,7 @@ class BackupPage extends StatelessWidget {
       size = await backupFileSize(path);
       BackupReminder.instance.markBackedUp(); // xatırlatma sayğacı sıfırlanır
     } catch (e) {
+      if (!context.mounted) return;
       _snack(context, _err(e));
       return;
     }
@@ -283,6 +285,7 @@ class BackupPage extends StatelessWidget {
             box == null ? null : box.localToGlobal(Offset.zero) & box.size,
       ));
     } catch (e) {
+      if (!btnContext.mounted) return;
       _snack(btnContext, 'Paylaşılamadı: $e');
     }
   }
@@ -304,6 +307,7 @@ class BackupPage extends StatelessWidget {
       manifest = await _withProgress<BackupManifest>(context, 'Yedek kontrol ediliyor',
           (p) => c.inspectBackup(path));
     } catch (e) {
+      if (!context.mounted) return;
       _snack(context, _err(e));
       return;
     }
@@ -319,6 +323,7 @@ class BackupPage extends StatelessWidget {
         });
       });
     } catch (e) {
+      if (!context.mounted) return;
       _snack(context, _err(e));
       return;
     }

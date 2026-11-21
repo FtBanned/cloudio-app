@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'main.dart';
 import 'player_controller.dart';
@@ -112,10 +112,8 @@ class _QueuePageState extends State<QueuePage> {
                       : ReorderableListView.builder(
                           buildDefaultDragHandles: false,
                           itemCount: next.length,
-                          onReorder: (oldI, newI) {
-                            if (newI > oldI) newI--;
-                            c.reorderUpNext(oldI, newI);
-                          },
+                          // onReorderItem: newIndex artıq silinən elementə görə düzəldilib
+                          onReorderItem: c.reorderUpNext,
                           itemBuilder: (context, i) {
                             final s = next[i];
                             return ListTile(

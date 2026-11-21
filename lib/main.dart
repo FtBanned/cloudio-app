@@ -5,7 +5,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:audio_service/audio_service.dart' show AudioService, AudioServiceConfig;
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import 'app_theme.dart';

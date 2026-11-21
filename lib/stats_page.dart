@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'app_theme.dart' show DarkZone;
 import 'main.dart' show kCard, kGreen, kText, kText12, kText38, kText54, kText60, kText70;

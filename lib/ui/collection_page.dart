@@ -34,32 +34,32 @@ List<SongGroup> groupSongs(List<Song> src, {required bool byAlbum}) {
 }
 
 class CollectionPage extends StatefulWidget {
-  final _CollectionKind kind;
+  final _CollectionKind _kind;
   final Playlist? playlistRef;
   final String? groupName; // sənətçi / albom adı
 
   const CollectionPage.all({super.key})
-      : kind = _CollectionKind.all,
+      : _kind = _CollectionKind.all,
         playlistRef = null,
         groupName = null;
   const CollectionPage.liked({super.key})
-      : kind = _CollectionKind.liked,
+      : _kind = _CollectionKind.liked,
         playlistRef = null,
         groupName = null;
   const CollectionPage.playlist(Playlist p, {super.key})
-      : kind = _CollectionKind.playlist,
+      : _kind = _CollectionKind.playlist,
         playlistRef = p,
         groupName = null;
   const CollectionPage.artist(String name, {super.key})
-      : kind = _CollectionKind.artist,
+      : _kind = _CollectionKind.artist,
         playlistRef = null,
         groupName = name;
   const CollectionPage.album(String name, {super.key})
-      : kind = _CollectionKind.album,
+      : _kind = _CollectionKind.album,
         playlistRef = null,
         groupName = name;
   const CollectionPage.genre(String name, {super.key})
-      : kind = _CollectionKind.genre,
+      : _kind = _CollectionKind.genre,
         playlistRef = null,
         groupName = name;
 
@@ -73,7 +73,7 @@ class _CollectionPageState extends State<CollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final kind = widget.kind;
+    final kind = widget._kind;
     final playlistRef = widget.playlistRef;
     final c = PlayerController.instance;
     return ListenableBuilder(
