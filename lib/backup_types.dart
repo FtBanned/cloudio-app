@@ -1,4 +1,4 @@
-/// Yedək sisteminin platformadan asılı olmayan tipləri (telefon və web üçün eyni).
+// Yedək sisteminin platformadan asılı olmayan tipləri (telefon və web üçün eyni).
 
 const kBackupFormat = 1;
 const kBackupExt = 'cloudio';

@@ -1067,11 +1067,9 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     coversRunning = false;
-    if (coversNote == null) {
-      coversNote = _coversCancel
-          ? 'Arama durduruldu'
-          : '$foundCovers kapak, $foundLyrics söz bulundu (${todo.length} şarkı tarandı)';
-    }
+    coversNote ??= _coversCancel
+        ? 'Arama durduruldu'
+        : '$foundCovers kapak, $foundLyrics söz bulundu (${todo.length} şarkı tarandı)';
     _coversCancel = false;
     notifyListeners();
   }
@@ -2134,23 +2132,5 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     await next();
-  }
-
-  String _mime(String ext) {
-    switch (ext) {
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'm4a':
-      case 'aac':
-        return 'audio/mp4';
-      case 'wav':
-        return 'audio/wav';
-      case 'flac':
-        return 'audio/flac';
-      case 'ogg':
-        return 'audio/ogg';
-      default:
-        return 'audio/mpeg';
-    }
   }
 }

@@ -355,7 +355,7 @@ class _CreateButton extends StatelessWidget {
           tween: ColorTween(
             end: open ? kBg : const Color(0xFFB3B3B3),
           ),
-          builder: (_, c, __) => Icon(Icons.add, size: 30, color: c),
+          builder: (_, c, _) => Icon(Icons.add, size: 30, color: c),
         ),
       ),
     );

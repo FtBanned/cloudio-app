@@ -263,7 +263,7 @@ class _SlideView extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: kText60, fontSize: 15, height: 1.5)),
             ],
-            if (extra != null) extra!,
+            ?extra,
           ],
         ),
       ),

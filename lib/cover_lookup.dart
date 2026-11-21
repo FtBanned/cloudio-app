@@ -425,8 +425,7 @@ class _MetaCand {
       this.year = 0,
       this.trackNo = 0,
       this.discNo = 0,
-      Future<void> Function(_MetaCand)? detail})
-      : _detail = detail;
+      this._detail});
 
   Future<void> resolve() async {
     final d = _detail;

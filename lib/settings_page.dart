@@ -6,13 +6,11 @@ import 'package:video_player/video_player.dart';
 import 'app_theme.dart';
 import 'main.dart'
     show
-        kBg,
         kCard,
         kGreen,
         kText,
         kText38,
         kText54,
-        kText60,
         kText70,
         formatTotal,
         showSleepSheet;
@@ -454,7 +452,7 @@ class ProfileCircle extends StatelessWidget {
                 alignment: Alignment.center,
                 // 1920x1080 şəkli tam ölçüdə yaddaşa yükləməsin
                 cacheWidth: (radius * 2 * 4).round(),
-                errorBuilder: (_, __, ___) => Center(
+                errorBuilder: (_, _, _) => Center(
                   child: Text(_initial(c.profileName),
                       style: TextStyle(
                           fontSize: radius * 0.95,

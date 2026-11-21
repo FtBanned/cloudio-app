@@ -16,8 +16,8 @@ class _MiniPlayerBody extends StatelessWidget {
   void _openFull(BuildContext context) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const DarkZone(child: NowPlayingPage()),
-        transitionsBuilder: (_, anim, __, child) => SlideTransition(
+        pageBuilder: (_, _, _) => const DarkZone(child: NowPlayingPage()),
+        transitionsBuilder: (_, anim, _, child) => SlideTransition(
           position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
               .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
           child: child,

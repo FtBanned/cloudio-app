@@ -11,7 +11,7 @@ import 'backup_types.dart';
 ///   8 bayt  "CLOUDIO1"
 ///   təkrar: [4 bayt ad uzunluğu][ad][8 bayt məlumat uzunluğu][məlumat]
 ///   sonda:  [4 bayt 0]
-/// Girişlər: manifest.json, db.json, audio/<fayl adı> ...
+/// Girişlər: manifest.json, db.json, `audio/<fayl adı>` ...
 const _magic = 'CLOUDIO1';
 const _maxManifestBytes = 20 * 1024 * 1024;
 

@@ -295,7 +295,7 @@ class MosaicCover extends StatelessWidget {
             fit: BoxFit.cover,
             cacheWidth: (s * 3).round(),
             gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade800)),
+            errorBuilder: (_, _, _) => Container(color: Colors.grey.shade800)),
       );
 }
 

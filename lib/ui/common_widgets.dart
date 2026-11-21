@@ -24,7 +24,7 @@ class Cover extends StatelessWidget {
                 fit: BoxFit.cover,
                 cacheWidth: (size * 3).round(),
                 gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => placeholder,
+                errorBuilder: (_, _, _) => placeholder,
               ),
       ),
     );
