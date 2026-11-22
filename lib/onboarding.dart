@@ -57,7 +57,8 @@ class _Slide {
   final IconData icon;
   final String title;
   final String body;
-  const _Slide(this.icon, this.title, this.body);
+  final bool logo; // true: ikon yerinə Cloudio loqosu göstər
+  const _Slide(this.icon, this.title, this.body, {this.logo = false});
 }
 
 const _slides = <_Slide>[
@@ -66,6 +67,7 @@ const _slides = <_Slide>[
     'Cloudio\'ya hoş geldin',
     'Müziğin, kendi cihazında. Şarkılarını ekle, çalma listeleri oluştur ve '
         'sözlerle birlikte dinle.',
+    logo: true,
   ),
   _Slide(
     Icons.library_music_outlined,
@@ -235,15 +237,21 @@ class _SlideView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: kGreen.withValues(alpha: 0.15),
+            if (slide.logo)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(27),
+                child: Image.asset('assets/icon/logo.png', width: 120, height: 120),
+              )
+            else
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: kGreen.withValues(alpha: 0.15),
+                ),
+                child: Icon(slide.icon, size: 60, color: kGreen),
               ),
-              child: Icon(slide.icon, size: 60, color: kGreen),
-            ),
             const SizedBox(height: 32),
             Text(
               slide.title,

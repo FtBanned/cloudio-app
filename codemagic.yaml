@@ -10,6 +10,8 @@ workflows:
     scripts:
       - name: Paketleri yukle
         script: flutter pub get
+      - name: Uygulama ikonu
+        script: dart run flutter_launcher_icons
       - name: Info.plist arka plan ses izni
         script: |
           PL=ios/Runner/Info.plist

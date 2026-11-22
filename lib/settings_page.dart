@@ -198,7 +198,10 @@ class SettingsPage extends StatelessWidget {
               onTap: () => openOnboarding(context),
             ),
             ListTile(
-              leading: Icon(Icons.info_outline, color: kText70),
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset('assets/icon/logo.png', width: 36, height: 36),
+              ),
               title: Text('Cloudio'),
               subtitle: Text('Sürüm 1.0.0', style: TextStyle(color: kText54, fontSize: 12)),
             ),

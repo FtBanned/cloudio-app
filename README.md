@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="120" alt="Cloudio logo"></p>
+
 # Cloudio
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.50-02569B?logo=flutter&logoColor=white)
