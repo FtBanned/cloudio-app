@@ -513,7 +513,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     return l.length > 10 ? l.sublist(0, 10) : l;
   }
 
-  // ---- "Sırada" kartı: mahnı bitməzdən ~10 san əvvəl növbəti mahnını göstərir ----
+  // ---- "Sırada" kartı: mahnının ortasında növbəti mahnını göstərir ----
   Song? upNextSong; // kartda göstərilən növbəti mahnı
   bool upNextVisible = false;
   Song? _upNextFor; // kart hansı mahnı üçün göstərilib (hər mahnıda bir dəfə)
@@ -523,17 +523,16 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     if (_upNextFor == s || repeatKind == RepeatKind.one || sleepAtSongEnd) return;
     final dur = s.duration ?? player.duration;
     if (dur == null || dur < const Duration(seconds: 40)) return;
-    final rem = dur - pos;
-    if (rem > const Duration(seconds: 10) || rem < const Duration(seconds: 2)) {
-      return;
-    }
+    // Mahnının ortasında göstər: yarıdan sonrakı ilk 10 saniyə pəncərəsi
+    final mid = dur ~/ 2;
+    if (pos < mid || pos > mid + const Duration(seconds: 10)) return;
     final idx = _peekNextIndex();
     if (idx == null) return; // sonuncu mahnıdır
     _upNextFor = s;
     upNextSong = _queue[idx];
     upNextVisible = true;
     _upNextTimer?.cancel();
-    _upNextTimer = Timer(const Duration(seconds: 7), dismissUpNext);
+    _upNextTimer = Timer(const Duration(seconds: 15), dismissUpNext);
     notifyListeners();
   }
 
