@@ -68,8 +68,8 @@ Flutter 3.50 / Dart 3.14, `material_ui`, `flutter_soloud` (pinned to 5.2.3), `au
 Requirements: Flutter 3.50 or newer (Dart 3.14).
 
 ```bash
-git clone https://github.com/FtBanned/cloudio.git
-cd cloudio
+git clone https://github.com/FtBanned/cloudio-app.git
+cd cloudio-app
 flutter pub get
 flutter run
 ```
