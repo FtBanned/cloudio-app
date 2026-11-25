@@ -146,6 +146,8 @@ class _MainShellState extends State<MainShell> {
     // Animasiyalı rehber tabları və "Oluştur" pəncərəsini buradan idarə edir
     TourBridge.selectTab = _tourSelectTab;
     TourBridge.setCreateOpen = _tourSetCreate;
+    TourBridge.openSongMenu = _tourOpenSongMenu;
+    TourBridge.closeSongMenu = _tourCloseSongMenu;
     // İlk quraşdırmada qarşılama ekranı (yalnız təzə, boş kitabxanada)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(maybeShowOnboarding(context));
@@ -156,6 +158,8 @@ class _MainShellState extends State<MainShell> {
   void dispose() {
     TourBridge.selectTab = null;
     TourBridge.setCreateOpen = null;
+    TourBridge.openSongMenu = null;
+    TourBridge.closeSongMenu = null;
     super.dispose();
   }
 
@@ -165,6 +169,21 @@ class _MainShellState extends State<MainShell> {
       _createOpen = false;
       _index = i;
     });
+  }
+
+  bool _tourMenuOpen = false;
+
+  /// Rehber "⋯" mahnı menyusunu özü açır (artıq açıqdırsa təkrar açmır).
+  void _tourOpenSongMenu(Song song) {
+    if (!mounted || _tourMenuOpen) return;
+    _tourMenuOpen = true;
+    showSongMenu(context, song).whenComplete(() => _tourMenuOpen = false);
+  }
+
+  void _tourCloseSongMenu() {
+    if (!mounted || !_tourMenuOpen) return;
+    _tourMenuOpen = false;
+    Navigator.of(context).maybePop();
   }
 
   void _tourSetCreate(bool open) {

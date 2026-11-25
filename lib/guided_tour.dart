@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import 'main.dart' show kGreen;
+import 'player_controller.dart';
 import 'wizard_mascot.dart';
 
 /// Rehberin işıq salacağı real interfeys elementləri. app_shell.dart bu açarları
@@ -23,6 +24,9 @@ class TourKeys {
   static final libLiked = GlobalKey(debugLabel: 'tour-lib-liked');
   static final libAll = GlobalKey(debugLabel: 'tour-lib-all');
   static final createPanel = GlobalKey(debugLabel: 'tour-create-panel');
+
+  // Mərhələ 2: mahnı menyusu ("⋯")
+  static final songMenu = GlobalKey(debugLabel: 'tour-song-menu');
 }
 
 /// Rehberin tətbiqi "idarə etməsi" üçün körpü. MainShell özünü bura qeyd edir,
@@ -30,6 +34,10 @@ class TourKeys {
 class TourBridge {
   static void Function(int tab)? selectTab;
   static void Function(bool open)? setCreateOpen;
+
+  /// Mərhələ 2: "⋯" mahnı menyusunu açır / bağlayır (MainShell qeyd edir)
+  static void Function(Song song)? openSongMenu;
+  static VoidCallback? closeSongMenu;
 }
 
 /// Animasiyalı rehberi idarə edir. Rehber MaterialApp-ın `builder`-ində qurulmuş
@@ -46,9 +54,18 @@ class GuidedTour {
     }
   }
 
+  /// Mahnını rehber özü başlatdısa, rehber bitəndə dayandırılır.
+  static bool startedPlayback = false;
+
   static void stop() {
     active.value = false;
     TourBridge.setCreateOpen?.call(false);
+    TourBridge.closeSongMenu?.call();
+    if (startedPlayback) {
+      startedPlayback = false;
+      final c = PlayerController.instance;
+      if (c.isPlaying) c.togglePlay();
+    }
   }
 }
 
@@ -98,7 +115,83 @@ class _TourStep {
 void _tab(int i) => TourBridge.selectTab?.call(i);
 void _create(bool open) => TourBridge.setCreateOpen?.call(open);
 
-final List<_TourStep> _steps = [
+/// Kitabxanada mahnı varsa tur onu çalır və üstündə göstərir; yoxdursa yalnız izah edir.
+List<_TourStep> _songSteps() {
+  final c = PlayerController.instance;
+  if (c.songs.isEmpty) {
+    return [
+      _TourStep(
+        title: 'Şarkı çalınca…',
+        body:
+            'Kitaplığın şu an boş, o yüzden çalacak şarkı yok. Şarkı eklediğinde altta mini '
+            'oynatıcı belirir; her şarkının yanındaki ⋯ düğmesi ise beğenme, düzenleme, '
+            'çalma listesine ekleme ve söz seçeneklerini açar.',
+        prepare: () => _create(false),
+      ),
+    ];
+  }
+  final song = c.songs.first;
+  return [
+    _TourStep(
+      target: TourKeys.libAll,
+      tap: true,
+      title: 'Bir şarkı çalayım',
+      body: 'Kitaplığında şarkı var, "${song.title}" şarkısını senin için çalıyorum.',
+      prepare: () {
+        _create(false);
+        _tab(2);
+      },
+      act: () {
+        if (!c.isPlaying || c.current != song) GuidedTour.startedPlayback = true;
+        c.playSong(song);
+      },
+    ),
+    _TourStep(
+      target: TourKeys.miniPlayer,
+      title: 'Mini oynatıcı',
+      body:
+          'Şarkı çalarken altta mini oynatıcı belirir: kapak, ad ve ▶/⏸ düğmesi burada. '
+          'Ona dokunursan tam ekran oynatıcı açılır.',
+      prepare: () {
+        _create(false);
+        TourBridge.closeSongMenu?.call();
+      },
+    ),
+    _TourStep(
+      target: TourKeys.songMenu,
+      title: 'Şarkı menüsü (⋯)',
+      body:
+          'Her şarkının yanındaki ⋯ düğmesine basınca bu menü açılır. '
+          'Şimdi senin yerine ben açtım.',
+      prepare: () {
+        final cur = c.current ?? song;
+        TourBridge.openSongMenu?.call(cur);
+      },
+    ),
+    _TourStep(
+      target: TourKeys.songMenu,
+      title: 'Menüde neler var?',
+      body: 'Beğenilenlere ekle, bilgileri düzenle, çalma listesine ekle ve söz bul/yükle.',
+      features: const [
+        (Icons.add_circle_outline, 'Beğen'),
+        (Icons.edit_outlined, 'Düzenle'),
+        (Icons.playlist_add, 'Listeye ekle'),
+        (Icons.lyrics_outlined, 'Sözler'),
+      ],
+      prepare: () {
+        final cur = c.current ?? song;
+        TourBridge.openSongMenu?.call(cur);
+      },
+    ),
+    _TourStep(
+      title: 'Menüyü kapattım',
+      body: 'Sıradaki durakta tam ekran oynatıcıya geçeceğiz.',
+      prepare: () => TourBridge.closeSongMenu?.call(),
+    ),
+  ];
+}
+
+List<_TourStep> _buildSteps() => [
   _TourStep(
     title: 'Merhaba, ben Cloudio Büyücüsü!',
     body: 'Sana uygulamayı gezdireyim. Düğmelere ben basacağım, sen sadece izle. Hazırsan başlayalım!',
@@ -186,15 +279,8 @@ final List<_TourStep> _steps = [
     body: 'Buna basıp listeye bir ad verirsin. Şarkıları şarkı menüsünden (⋯) içine eklersin.',
     prepare: () => _create(true),
   ),
-  // ---------- Mərhələ 2+ üçün müvəqqəti: köhnə addımlar ----------
-  _TourStep(
-    target: TourKeys.miniPlayer,
-    title: 'Mini oynatıcı',
-    body:
-        'Bir şarkı çalarken altta mini oynatıcı belirir. Ona dokunursan tam ekran açılır: '
-        'sözler, sıra, hız ve daha fazlası.',
-    prepare: () => _create(false),
-  ),
+  // ---------- Mərhələ 2: mahnı çalma, mini oynadıcı, "⋯" menyusu ----------
+  ..._songSteps(),
   const _TourStep(
     title: 'Sihirli özellikler',
     body: 'Tam ekran oynatıcıda bunların hepsi var. Hepsini bir kez dene!',
@@ -241,6 +327,8 @@ class _TourOverlayState extends State<_TourOverlay> with SingleTickerProviderSta
   int _chars = 0;
   Timer? _typer;
   Timer? _actTimer;
+
+  late final List<_TourStep> _steps = _buildSteps();
 
   _TourStep get _step => _steps[_i];
   bool get _typing => _chars < _step.body.length;

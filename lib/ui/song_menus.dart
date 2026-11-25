@@ -1,14 +1,15 @@
 part of '../main.dart';
 
 /// Şarkı "⋯" menüsü.
-void showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
+Future<void> showSongMenu(BuildContext context, Song song, {Playlist? playlist}) {
   final c = PlayerController.instance;
-  showModalBottomSheet(
+  return showModalBottomSheet<void>(
     context: context,
     backgroundColor: kCard,
     shape: _sheetShape,
     builder: (ctx) => SafeArea(
       child: Column(
+        key: TourKeys.songMenu, // animasiyalı rehber üçün
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
