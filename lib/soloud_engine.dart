@@ -24,12 +24,27 @@ class SoloudEngine {
 
   static const int kBands = 10;
 
+  // DƏYİŞDİ: Bluetooth qulaqlıqda xışıltı / kəsilmə olarsa bu iki rəqəmlə oynayın.
+  // Defolt SoLoud: bufferSize 2048, sampleRate 44100.
+  // Daha böyük bufer = daha sabit səs, amma bir az gecikmə (4096 təxminən 85 ms).
+  static const int kBufferSize = 4096;
+  static const int kSampleRate = 48000;
+
   bool ready = false;
 
   Future<void> init() async {
     if (ready) return;
     try {
-      await SoLoud.instance.init();
+      // DƏYİŞDİ: əvvəl xüsusi ayarla, alınmasa köhnə defolt ayarla başladırıq
+      try {
+        await SoLoud.instance.init(
+          sampleRate: kSampleRate,
+          bufferSize: kBufferSize,
+        );
+      } catch (e) {
+        debugPrint('[Cloudio] SoLoud xüsusi ayarla başlamadı, defolta qayıdıram: $e');
+        await SoLoud.instance.init();
+      }
       ready = true;
       // Çıxış cihazı avtomatik başlamasa (məs. iOS-da qulaqlıq dəyişəndən sonra),
       // səssiz qalmasın deyə cihazı yenidən başlatmağa cəhd edirik.
