@@ -13,7 +13,11 @@ class CloudioApp extends StatelessWidget {
         theme: AppTheme.instance.themeData,
         // "Sırada" kartı bütün ekranların (Now Playing daxil) üstündə göstərilir
         builder: (context, child) =>
-            Stack(children: [child ?? const SizedBox.shrink(), const _UpNextOverlay()]),
+            Stack(children: [
+          child ?? const SizedBox.shrink(),
+          const _UpNextOverlay(),
+          const GuidedTourHost(), // animasiyalı büyücü rehberi (hamısının üstündə)
+        ]),
         home: const MainShell(),
       ),
     );
@@ -226,7 +230,7 @@ class _MainShellState extends State<MainShell> {
               key: _barKey,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const MiniPlayer(),
+                KeyedSubtree(key: TourKeys.miniPlayer, child: const MiniPlayer()),
                 SafeArea(
                   top: false,
                   child: SizedBox(
@@ -234,6 +238,7 @@ class _MainShellState extends State<MainShell> {
                     child: Row(
                       children: [
                         _NavItem(
+                          tourKey: TourKeys.home,
                           label: 'Ana Sayfa',
                           selected: !_createOpen && _index == 0,
                           icon: const Icon(Icons.home_outlined),
@@ -241,12 +246,14 @@ class _MainShellState extends State<MainShell> {
                           onTap: () => _onTap(0),
                         ),
                         _NavItem(
+                          tourKey: TourKeys.search,
                           label: 'Arama',
                           selected: !_createOpen && _index == 1,
                           icon: const Icon(Icons.search),
                           onTap: () => _onTap(1),
                         ),
                         _NavItem(
+                          tourKey: TourKeys.library,
                           label: 'Kitaplığın',
                           selected: !_createOpen && _index == 2,
                           icon: const _LibraryIcon(filled: false),
@@ -254,6 +261,7 @@ class _MainShellState extends State<MainShell> {
                           onTap: () => _onTap(2),
                         ),
                         _NavItem(
+                          tourKey: TourKeys.create,
                           label: 'Oluştur',
                           selected: false,
                           hideLabel: _createOpen,
@@ -281,6 +289,7 @@ class _NavItem extends StatelessWidget {
   final Widget icon;
   final Widget? selectedIcon;
   final VoidCallback onTap;
+  final GlobalKey? tourKey; // rehberin işıq salması üçün
   const _NavItem({
     required this.label,
     required this.selected,
@@ -288,6 +297,7 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
     this.selectedIcon,
     this.hideLabel = false,
+    this.tourKey,
   });
 
   @override
@@ -295,6 +305,7 @@ class _NavItem extends StatelessWidget {
     final color = selected ? kText : const Color(0xFFB3B3B3);
     return Expanded(
       child: GestureDetector(
+        key: tourKey,
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Column(

@@ -13,6 +13,7 @@ import 'audio_handler.dart';
 import 'backup_page.dart' show openBackupPage;
 import 'backup_reminder.dart';
 import 'cover_tint.dart' show CoverPalette, coverPalette;
+import 'guided_tour.dart';
 import 'cover_lookup.dart' show CoverCandidate, fetchCoverImage, kOnlineCovers, searchCandidates;
 import 'lyrics.dart';
 import 'lyrics_share.dart';

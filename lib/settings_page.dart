@@ -10,6 +10,7 @@ import 'backup_page.dart';
 import 'booster.dart';
 import 'booster_page.dart';
 import 'duplicates_page.dart';
+import 'guided_tour.dart';
 import 'onboarding.dart';
 import 'player_controller.dart';
 import 'stats_page.dart';
@@ -196,6 +197,19 @@ class SettingsPage extends StatelessWidget {
               title: const Text('Tanıtımı yeniden göster'),
               trailing: Icon(Icons.chevron_right, color: kText38),
               onTap: () => openOnboarding(context),
+            ),
+            ListTile(
+              leading: Icon(Icons.auto_fix_high, color: kText70),
+              title: const Text('Büyücü rehberi (animasyonlu)'),
+              subtitle: Text(
+                'Uygulamayı adım adım gösterir',
+                style: TextStyle(color: kText54, fontSize: 12),
+              ),
+              trailing: Icon(Icons.chevron_right, color: kText38),
+              onTap: () {
+                Navigator.of(context).popUntil((r) => r.isFirst); // Ayarlar'dan çık
+                GuidedTour.start(delay: const Duration(milliseconds: 400));
+              },
             ),
             ListTile(
               leading: ClipRRect(

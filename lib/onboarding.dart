@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'guided_tour.dart';
 import 'main.dart' show kBg, kGreen, kText, kText38, kText54, kText60;
 import 'persistence.dart';
 import 'player_controller.dart';
@@ -11,8 +12,8 @@ import 'player_controller.dart';
 const bool kOnboardingForceShow = false;
 
 /// Qarşılama ekranını əl ilə açır (Ayarlar → Hakkında). "Görüldü" qeydinə toxunmur.
-void openOnboarding(BuildContext context) {
-  Navigator.of(
+Future<void> openOnboarding(BuildContext context) {
+  return Navigator.of(
     context,
   ).push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => const OnboardingPage()));
 }
@@ -50,7 +51,9 @@ Future<void> maybeShowOnboarding(BuildContext context) async {
     await CloudioStore.instance.saveOnboardingSeen();
   }
   if (!context.mounted) return;
-  openOnboarding(context);
+  await openOnboarding(context);
+  // qarşılama bitəndə büyücü rehberi (yalnız ilk quraşdırmada) avtomatik başlayır
+  GuidedTour.start(delay: const Duration(milliseconds: 450));
 }
 
 class _Slide {
