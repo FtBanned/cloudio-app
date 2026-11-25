@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:video_player/video_player.dart';
 
 import 'app_theme.dart';
+import 'platform_flags.dart';
 import 'main.dart'
     show kCard, kGreen, kText, kText38, kText54, kText70, formatTotal, showSleepSheet;
 import 'backup_page.dart';
@@ -712,6 +713,8 @@ class _AdminBackdropState extends State<_AdminBackdrop> with WidgetsBindingObser
   }
 
   Future<void> _initVideo() async {
+    // Windows-da video_player yoxdur: yalnız statik şəkil (admin_bg.jpg) göstərilir
+    if (kIsWindowsApp) return;
     try {
       // ÖNEMLİ: videoPlayerOptions(mixWithOthers: true) VERMİYORUZ. iOS'ta bu seçenek
       // uygulamanın ortak ses oturumunu "diğer seslerle karışır" moduna alıyor; iOS de

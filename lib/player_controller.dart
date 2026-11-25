@@ -21,6 +21,7 @@ import 'cover_tint.dart';
 import 'local_files_stub.dart' if (dart.library.io) 'local_files_io.dart';
 import 'lyrics.dart';
 import 'persistence.dart';
+import 'platform_flags.dart';
 import 'soloud_engine.dart' show SoloudEngine;
 import 'soloud_player.dart';
 import 'tag_reader.dart';
@@ -104,8 +105,8 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
   PlayerController._() {
     WidgetsBinding.instance.addObserver(this);
     _bind(player);
-    unawaited(_route.start()); // qulaqlıq çıxanda dayan, taxılanda davam et
-    if (!kIsWeb) unawaited(_listenInterruptions()); // zəng / WhatsApp / TikTok kəsintisi
+    if (!kIsWindowsApp) unawaited(_route.start()); // qulaqlıq çıxanda dayan, taxılanda davam et
+    if (!kIsWeb && !kIsWindowsApp) unawaited(_listenInterruptions()); // zəng / WhatsApp / TikTok kəsintisi
     unawaited(_restore()); // əvvəl saxlanmış kitabxananı yüklə
   }
 

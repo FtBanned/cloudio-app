@@ -20,6 +20,7 @@ import 'lyrics_share.dart';
 import 'onboarding.dart';
 import 'booster.dart';
 import 'booster_page.dart';
+import 'platform_flags.dart';
 import 'player_controller.dart';
 import 'queue_page.dart';
 import 'settings_page.dart';
@@ -43,7 +44,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Kilid ekranı və arxa planda çalma (yalnız telefonda; web-də söndürülüb).
   // Xəta olsa tətbiq yenə də açılır, sadəcə kilid ekranı idarəsi olmur.
-  if (!kIsWeb) {
+  if (!kIsWeb && !kIsWindowsApp) {
     try {
       // iOS: ses oturumu "playback" olmalı, yoksa uygulama arka plana geçince müzik susar
       final session = await AudioSession.instance;
