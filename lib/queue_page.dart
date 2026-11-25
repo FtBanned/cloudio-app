@@ -136,7 +136,22 @@ class _QueuePageState extends State<QueuePage> {
                                         Icons.remove_circle_outline,
                                         color: Colors.redAccent,
                                       ),
-                                      onPressed: () => c.removeFromUpNext(i),
+                                      onPressed: () {
+                                        final removed = next[i];
+                                        c.removeFromUpNext(i);
+                                        final m = ScaffoldMessenger.of(context);
+                                        m.hideCurrentSnackBar();
+                                        m.showSnackBar(
+                                          SnackBar(
+                                            duration: const Duration(seconds: 4),
+                                            content: Text('"${removed.title}" sıradan çıxarıldı'),
+                                            action: SnackBarAction(
+                                              label: 'Geri al',
+                                              onPressed: () => c.restoreToUpNext(removed),
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     )
                                   : ReorderableDragStartListener(
                                       index: i,
@@ -146,6 +161,46 @@ class _QueuePageState extends State<QueuePage> {
                           },
                         ),
                 ),
+                if (c.removedFromUpNext.isNotEmpty) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Sıradan çıxarılanlar (geri qaytar)',
+                        style: TextStyle(color: kText60, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: c.removedFromUpNext.length,
+                      itemBuilder: (context, i) {
+                        // ən son çıxarılan yuxarıda
+                        final s = c.removedFromUpNext[c.removedFromUpNext.length - 1 - i].song;
+                        return ListTile(
+                          dense: true,
+                          leading: Cover(size: 40, bytes: s.cover),
+                          title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(
+                            s.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: kText60),
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Geri qaytar',
+                            icon: Icon(Icons.add_circle_outline, color: kGreen),
+                            onPressed: () => c.restoreToUpNext(s),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show Color;
 
+import 'package:audio_session/audio_session.dart'
+    show AudioInterruptionType, AudioSession, AudioSessionConfiguration;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart'
@@ -103,7 +105,68 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _bind(player);
     unawaited(_route.start()); // qulaqlıq çıxanda dayan, taxılanda davam et
+    if (!kIsWeb) unawaited(_listenInterruptions()); // zəng / WhatsApp / TikTok kəsintisi
     unawaited(_restore()); // əvvəl saxlanmış kitabxananı yüklə
+  }
+
+  // ---- səs kəsintisi: zəng, WhatsApp səsli mesaj, TikTok videosu və s. ----
+  // Kəsinti olanda iOS səs oturumunu və SoLoud çıxış cihazını dayandırır. Əvvəl bundan sonra
+  // "oynat" düyməsi işləmirdi (cihaz səssiz qalırdı). İndi: kəsinti başlayanda pauza edirik və
+  // cihazı "çirkli" işarələyirik; növbəti oynatmadan əvvəl oturum yenidən aktivləşir,
+  // cihaz yenilənir. Kəsinti bitəndə (iOS "davam et" desə) avtomatik davam edir.
+  bool _deviceDirty = false; // kəsintidən sonra cihaz yenilənməlidir
+  bool _pausedByInterruption = false; // kəsinti çalan mahnını dayandırıb
+
+  Future<void> _listenInterruptions() async {
+    try {
+      final session = await AudioSession.instance;
+      session.interruptionEventStream.listen((e) {
+        if (e.begin) {
+          if (e.type == AudioInterruptionType.duck) return; // yalnız səsi azaltmaq
+          _deviceDirty = true;
+          final st = _stoppedAt;
+          final justStopped =
+              st != null &&
+              DateTime.now().difference(st) < const Duration(seconds: 2) &&
+              !_userPaused &&
+              player.processingState != ProcessingState.completed;
+          if (player.playing || justStopped) {
+            _pausedByInterruption = true;
+            if (player.playing) {
+              _cancelFade();
+              unawaited(player.pause()); // _userPaused-a toxunmur
+            }
+          }
+          debugPrint('[Cloudio] səs kəsintisi başladı (pauza=$_pausedByInterruption)');
+        } else {
+          debugPrint('[Cloudio] səs kəsintisi bitdi (davam=${e.type == AudioInterruptionType.pause})');
+          final resume = _pausedByInterruption && e.type == AudioInterruptionType.pause;
+          _pausedByInterruption = false;
+          if (resume && !_userPaused && !player.playing && current != null) {
+            unawaited(_playWithSession());
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('[Cloudio] Kəsinti izləmə başlamadı: $e');
+    }
+  }
+
+  /// Kəsintidən sonra: oturumu yenidən aktiv et + səs cihazını yenilə. Sonra çal.
+  Future<void> _playWithSession() async {
+    if (!kIsWeb && _deviceDirty) {
+      _deviceDirty = false;
+      try {
+        final session = await AudioSession.instance;
+        await session.configure(const AudioSessionConfiguration.music());
+        await session.setActive(true);
+      } catch (e) {
+        debugPrint('[Cloudio] oturum yenidən aktiv olmadı: $e');
+      }
+      await SoloudEngine.instance.restartDevice();
+    }
+    _pausedByInterruption = false;
+    await player.play();
   }
 
   // ---- qulaqlıq çıxanda avto-pauza, taxılanda avto-davam ----
@@ -1696,6 +1759,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
 
   /// [context] verilirse sıra o liste olur (çalma listesi, beğenilenler...).
   Future<void> playSong(Song s, {List<Song>? context}) async {
+    removedFromUpNext.clear();
     _queue = List.of(context ?? songs);
     queueName = _nameFor(context);
     var i = _queue.indexOf(s);
@@ -1782,7 +1846,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void play() => unawaited(player.play());
+  void play() => unawaited(_playWithSession());
 
   Future<void> pause() async {
     _userPaused = true;
@@ -1965,6 +2029,10 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// Sıradan çıxarılan mahnılar (yanlışlıqla çıxarılanı geri qaytarmaq üçün).
+  /// Sıra dəyişəndə (yeni mahnı / siyahı başlayanda) təmizlənir.
+  final List<({Song song, int index})> removedFromUpNext = [];
+
   /// Mahnını yalnız sıradan çıxarır (kitabxanadan silmir).
   void removeFromUpNext(int i) {
     final cur = currentIndex;
@@ -1973,6 +2041,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
       final k = _pos + 1 + i;
       if (k >= _order.length) return;
       final qi = _order.removeAt(k);
+      removedFromUpNext.add((song: _queue[qi], index: i));
       _queue.removeAt(qi);
       for (var j = 0; j < _order.length; j++) {
         if (_order[j] > qi) _order[j]--;
@@ -1981,7 +2050,30 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     } else {
       final k = cur + 1 + i;
       if (k >= _queue.length) return;
+      removedFromUpNext.add((song: _queue[k], index: i));
       _queue.removeAt(k);
+    }
+    _saveQueueState();
+    notifyListeners();
+  }
+
+  /// Sıradan çıxarılmış mahnını geri qaytarır (əvvəlki yerinə, yer yoxdursa sonuna).
+  void restoreToUpNext(Song s) {
+    final cur = currentIndex;
+    final at = removedFromUpNext.indexWhere((e) => identical(e.song, s));
+    if (at < 0) return;
+    final entry = removedFromUpNext.removeAt(at);
+    if (cur == null || _queue.contains(s)) {
+      notifyListeners();
+      return;
+    }
+    final i = entry.index.clamp(0, upNext.length).toInt();
+    if (_orderValid) {
+      final qi = _queue.length;
+      _queue.add(s);
+      _order.insert(_pos + 1 + i, qi);
+    } else {
+      _queue.insert(cur + 1 + i, s);
     }
     _saveQueueState();
     notifyListeners();
@@ -2053,6 +2145,7 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     final list = context ?? songs;
     if (list.isEmpty) return;
     if (!shuffleOn) shuffleMode = ShuffleMode.normal; // Ağıllı mix seçilibsə qalır
+    removedFromUpNext.clear();
     _queue = List.of(list);
     queueName = _nameFor(context);
     _buildShuffle();
