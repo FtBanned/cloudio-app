@@ -1895,28 +1895,27 @@ class PlayerController extends ChangeNotifier with WidgetsBindingObserver {
     _pos = 0;
   }
 
-  // ---- Ağıllı mix: hər mahnıya çəki verilir, çəkili təsadüfi sıra qurulur ----
-  /// Çəki nə qədər böyükdürsə, mahnı sıranın əvvəlinə o qədər çox düşür.
-  /// - çox dinlədiklərin və bəyəndiklərin irəli çəkilir;
-  /// - çoxdandır (30+ gün) çalınmayan sevimlilər "yenidən kəşf" üçün irəli çəkilir;
-  /// - heç çalınmamışlara kiçik bonus verilir;
-  /// - bu gün çalınanlar geri atılır ki, təkrar eşitməyəsən.
+    /// Ağıllı mix: çəkili təsadüfi sıra, 3 pillə:
+  /// 1) heç dinlənməyənlər ən çox önə düşür;
+  /// 2) sonra çox dinlədiklərin və bəyəndiklərin;
+  /// 3) qalanlar normal.
+  /// Çəkili təsadüfi olduğu üçün hər dəfə fərqli sıra çıxır.
+  static const double _kNewWeight = 10.0;
+
   double _smartWeight(Song s, int nowMs) {
-    var w = 1.0 + log(1 + s.playCount) * 0.9;
+    final neverHeard = s.playCount == 0 && s.lastPlayedMs == 0;
+    var w = neverHeard ? _kNewWeight : 1.0 + log(1 + s.playCount) * 0.9;
     if (s.liked) w *= 1.5;
     if (s.lastPlayedMs > 0) {
       final days = (nowMs - s.lastPlayedMs) / 86400000;
       if (days < 1) {
-        w *= 0.35;
+        w *= 0.35; // bu gün çalınanlar geri atılır
       } else if (days > 30 && s.playCount >= 2) {
-        w *= 1.8;
+        w *= 1.8; // çoxdan çalınmayan sevimlilər yenidən kəşf
       }
-    } else {
-      w *= 1.2;
     }
     return w;
   }
-
   /// Çəkili təsadüfi sıra (Efraimidis–Spirakis): açar = u^(1/w), böyükdən kiçiyə.
   List<int> _smartOrder() {
     final now = DateTime.now().millisecondsSinceEpoch;
