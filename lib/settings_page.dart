@@ -199,7 +199,7 @@ class SettingsPage extends StatelessWidget {
               onTap: () => openOnboarding(context),
             ),
             ListTile(
-              leading: Icon(Icons.auto_fix_high, color: kText70),
+              leading: Icon(Icons.auto_awesome, color: kText70),
               title: const Text('Büyücü rehberi (animasyonlu)'),
               subtitle: Text(
                 'Uygulamayı adım adım gösterir',

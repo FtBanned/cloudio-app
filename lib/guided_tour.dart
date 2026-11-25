@@ -474,11 +474,17 @@ class _TapHint extends StatelessWidget {
         offset: Offset(10, 12 + press * 6),
         child: Transform.scale(
           scale: 1 - 0.12 * press,
-          child: const Icon(
-            Icons.touch_app,
-            size: 38,
-            color: Colors.white,
-            shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
+          // barmaq ucu: ikon əvəzinə çəkilmiş dairə (yeni ikon = font dəyişir = Shorebird patch rədd edir)
+          child: Center(
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.92),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 10)],
+              ),
+            ),
           ),
         ),
       ),
