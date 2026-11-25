@@ -77,6 +77,7 @@ flutter:
     - assets/admin_bg.jpg
     - assets/admin_bg.mp4
     - assets/icon/logo.png
+    - shorebird.yaml
 
   # To add assets to your application, add an assets section, like this:
   # assets:
