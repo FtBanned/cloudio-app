@@ -27,6 +27,25 @@ class TourKeys {
 
   // Mərhələ 2: mahnı menyusu ("⋯")
   static final songMenu = GlobalKey(debugLabel: 'tour-song-menu');
+
+  // Mərhələ 3: tam ekran oynadıcı
+  static final npLike = GlobalKey(debugLabel: 'tour-np-like');
+  static final npSeek = GlobalKey(debugLabel: 'tour-np-seek');
+  static final npShuffle = GlobalKey(debugLabel: 'tour-np-shuffle');
+  static final npPrev = GlobalKey(debugLabel: 'tour-np-prev');
+  static final npPlay = GlobalKey(debugLabel: 'tour-np-play');
+  static final npNext = GlobalKey(debugLabel: 'tour-np-next');
+  static final npRepeat = GlobalKey(debugLabel: 'tour-np-repeat');
+
+  // Mərhələ 4: tam ekranın alt düymələri, Ayarlar
+  static final npSleep = GlobalKey(debugLabel: 'tour-np-sleep');
+  static final npBooster = GlobalKey(debugLabel: 'tour-np-booster');
+  static final npTune = GlobalKey(debugLabel: 'tour-np-tune');
+  static final npQueue = GlobalKey(debugLabel: 'tour-np-queue');
+  static final npLyrics = GlobalKey(debugLabel: 'tour-np-lyrics');
+  static final settingsSleep = GlobalKey(debugLabel: 'tour-settings-sleep');
+  static final settingsBackup = GlobalKey(debugLabel: 'tour-settings-backup');
+  static final settingsScroll = ScrollController();
 }
 
 /// Rehberin tətbiqi "idarə etməsi" üçün körpü. MainShell özünü bura qeyd edir,
@@ -38,6 +57,12 @@ class TourBridge {
   /// Mərhələ 2: "⋯" mahnı menyusunu açır / bağlayır (MainShell qeyd edir)
   static void Function(Song song)? openSongMenu;
   static VoidCallback? closeSongMenu;
+
+  /// Mərhələ 3: tam ekran oynadıcını açır / bağlayır
+  static VoidCallback? openFull;
+  static VoidCallback? closeFull;
+  static VoidCallback? openSettingsPage;
+  static VoidCallback? closeSettingsPage;
 }
 
 /// Animasiyalı rehberi idarə edir. Rehber MaterialApp-ın `builder`-ində qurulmuş
@@ -61,6 +86,8 @@ class GuidedTour {
     active.value = false;
     TourBridge.setCreateOpen?.call(false);
     TourBridge.closeSongMenu?.call();
+    TourBridge.closeFull?.call();
+    TourBridge.closeSettingsPage?.call();
     if (startedPlayback) {
       startedPlayback = false;
       final c = PlayerController.instance;
@@ -191,6 +218,143 @@ List<_TourStep> _songSteps() {
   ];
 }
 
+/// Mərhələ 3: tam ekran oynadıcı. Mahnı varsa tur onu özü açır və düymələri göstərir.
+List<_TourStep> _playerSteps() {
+  final c = PlayerController.instance;
+  if (c.songs.isEmpty) {
+    return [
+      _TourStep(
+        title: 'Tam ekran oynatıcı',
+        body:
+            'Şarkı çalarken mini oynatıcıya dokununca tam ekran açılır: beğen (✓), karıştır, '
+            'geri/ileri, tekrar ve ilerleme çubuğu burada. Şarkı ekleyince hepsini gösteririm.',
+      ),
+    ];
+  }
+  _TourStep inFull(GlobalKey k, String title, String body, {VoidCallback? act, bool tap = false}) =>
+      _TourStep(
+        target: k,
+        title: title,
+        body: body,
+        tap: tap,
+        act: act,
+        prepare: () => TourBridge.openFull?.call(),
+      );
+  return [
+    _TourStep(
+      target: TourKeys.miniPlayer,
+      tap: true,
+      title: 'Tam ekrana geçelim',
+      body: 'Mini oynatıcıya dokunursam tam ekran oynatıcı açılır. Bak, ben açıyorum!',
+      prepare: () {
+        TourBridge.closeSongMenu?.call();
+        _create(false);
+      },
+      act: () => TourBridge.openFull?.call(),
+    ),
+    inFull(TourKeys.npLike, 'Beğen (✓)',
+        'Bu düğmeyle şarkıyı Beğenilen Şarkılar listene eklersin. Tekrar basarsan çıkarır.'),
+    inFull(TourKeys.npSeek, 'İlerleme çubuğu',
+        'Çubuğu kaydırarak şarkının istediğin yerine atlarsın. Sol sayı geçen, sağ sayı toplam süredir.',
+        act: () {
+      final d = c.player.duration;
+      if (d != null && d.inSeconds > 20) c.seek(d * 0.3);
+    }),
+    inFull(TourKeys.npShuffle, 'Karıştır',
+        'Basınca seçenekler açılır: kapalı, normal karışık veya akıllı karışık (✨).'),
+    inFull(TourKeys.npPrev, 'Geri', 'Önceki şarkıya döner.'),
+    inFull(TourKeys.npPlay, 'Çal / Duraklat', 'Büyük beyaz düğme şarkıyı başlatır veya duraklatır.'),
+    inFull(TourKeys.npNext, 'İleri', 'Sıradaki şarkıya geçer. Sırada başka şarkı yoksa pasif görünür.'),
+    inFull(TourKeys.npRepeat, 'Tekrar',
+        'Her basışta tekrar modu değişir: kapalı, liste tekrarı, tek şarkı tekrarı (1 işaretli).'),
+  ];
+}
+
+/// Hədəf görünməyən yerdədirsə (aşağı sürüşdürmə) ekrana gətirir.
+Future<void> _reveal(GlobalKey k, {ScrollController? list}) async {
+  await Future<void>.delayed(const Duration(milliseconds: 600));
+  if (list != null && k.currentContext == null && list.hasClients) {
+    list.jumpTo(list.position.maxScrollExtent); // tənbəl siyahıda elementi qurdurmaq üçün
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+  }
+  final ctx = k.currentContext;
+  if (ctx != null && ctx.mounted) {
+    await Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.4,
+      duration: const Duration(milliseconds: 350),
+    );
+  }
+}
+
+/// Mərhələ 4: tam ekranın alt düymələri, sözlər, Ayarlar və yedəkləmə.
+List<_TourStep> _moreSteps() {
+  final c = PlayerController.instance;
+  final hasSong = c.songs.isNotEmpty;
+  _TourStep inFull(GlobalKey k, String title, String body, {bool scroll = false}) => _TourStep(
+    target: k,
+    title: title,
+    body: body,
+    prepare: () {
+      TourBridge.closeSettingsPage?.call();
+      TourBridge.openFull?.call();
+      if (scroll) _reveal(k);
+    },
+  );
+  _TourStep inSettings(GlobalKey k, String title, String body) => _TourStep(
+    target: k,
+    title: title,
+    body: body,
+    prepare: () {
+      TourBridge.openSettingsPage?.call();
+      _reveal(k, list: TourKeys.settingsScroll);
+    },
+  );
+  return [
+    if (hasSong) ...[
+      inFull(TourKeys.npSleep, 'Uyku zamanlayıcısı',
+          'Uyurken dinliyorsan süre seç: müzik kendiliğinden durur. Aktifken kalan süre yeşil görünür.'),
+      inFull(TourKeys.npBooster, 'Ses güçlendirici',
+          'Sesi ve bası güçlendiren ekolayzır penceresi. Açıkken ikon yeşil yanar.'),
+      inFull(TourKeys.npTune, 'Çalma ayarları',
+          'Bu düğme Ayarlar sayfasını açar: geçiş (crossfade), tema ve diğer çalma seçenekleri.'),
+      inFull(TourKeys.npQueue, 'Sıra',
+          'Sırada hangi şarkıların olduğunu görürsün. Şarkıları sürükleyip yerini değiştirebilir veya çıkarabilirsin.'),
+      inFull(TourKeys.npLyrics, 'Şarkı sözleri',
+          'Sözler çalan şarkıyla senkron akar. Söz yoksa ⋯ menüsünden internette arayabilir veya .lrc/.txt yükleyebilirsin. Karta basınca tam ekran söz görünümü açılır.',
+          scroll: true),
+    ] else
+      const _TourStep(
+        title: 'Sihirli özellikler',
+        body: 'Şarkı çalarken tam ekran oynatıcıda bunların hepsi var. Şarkı ekleyince göstereyim!',
+        mood: WizardMood.cheer,
+        features: [
+          (Icons.lyrics, 'Sözler'),
+          (Icons.queue_music, 'Sıra'),
+          (Icons.graphic_eq, 'Güçlendirici'),
+          (Icons.bedtime_outlined, 'Uyku'),
+        ],
+      ),
+    _TourStep(
+      target: TourKeys.homeAvatar,
+      tap: true,
+      title: 'Ayarlar',
+      body: 'Profil resmine dokunuyorum, Ayarlar açılıyor. Bak!',
+      prepare: () {
+        TourBridge.closeFull?.call();
+        TourBridge.closeSettingsPage?.call();
+        _create(false);
+        _tab(0);
+      },
+      act: () => TourBridge.openSettingsPage?.call(),
+    ),
+    inSettings(TourKeys.settingsSleep, 'Uyku zamanlayıcısı (Ayarlar)',
+        'Zamanlayıcıyı buradan da kurabilirsin: süreli veya "şarkı bitince" durdur.'),
+    inSettings(TourKeys.settingsBackup, 'Yedekle ve geri yükle',
+        'Uygulamayı silersen kitaplığın da gider. Buradan dosyaya yedek al, sonra geri yükle.'),
+  ];
+}
+
 List<_TourStep> _buildSteps() => [
   _TourStep(
     title: 'Merhaba, ben Cloudio Büyücüsü!',
@@ -281,28 +445,15 @@ List<_TourStep> _buildSteps() => [
   ),
   // ---------- Mərhələ 2: mahnı çalma, mini oynadıcı, "⋯" menyusu ----------
   ..._songSteps(),
-  const _TourStep(
-    title: 'Sihirli özellikler',
-    body: 'Tam ekran oynatıcıda bunların hepsi var. Hepsini bir kez dene!',
-    mood: WizardMood.cheer,
-    features: [
-      (Icons.lyrics, 'Sözler'),
-      (Icons.ios_share, 'Söz kartı'),
-      (Icons.graphic_eq, 'Güçlendirici'),
-      (Icons.bedtime_outlined, 'Uyku'),
-    ],
-  ),
-  const _TourStep(
-    title: 'Yedeklemeyi unutma',
-    body:
-        'Uygulamayı silersen kitaplığın da gider. Ayarlar → "Yedekle ve geri yükle" ile '
-        'düzenli yedek al.',
-  ),
+  ..._playerSteps(),
+  ..._moreSteps(),
   _TourStep(
     title: 'Hazırsın!',
     body: 'Beni tekrar görmek istersen Ayarlar → Hakkında → "Büyücü rehberi"ne bas. İyi dinlemeler!',
     mood: WizardMood.cheer,
     prepare: () {
+      TourBridge.closeSettingsPage?.call();
+      TourBridge.closeFull?.call();
       _create(false);
       _tab(0);
     },

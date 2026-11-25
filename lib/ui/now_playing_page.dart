@@ -2,6 +2,18 @@ part of '../main.dart';
 
 // ================= Mini oynatıcı =================
 /// Mini pleyer kapaqdan rənglənir, ona görə seçilmiş temadan asılı olmayaraq tünd qalır.
+/// Tam ekran oynadıcıya sürüşən keçid (mini pleyer və animasiyalı rehber istifadə edir).
+Route<void> nowPlayingRoute() => PageRouteBuilder<void>(
+  pageBuilder: (_, _, _) => const DarkZone(child: NowPlayingPage()),
+  transitionsBuilder: (_, anim, _, child) => SlideTransition(
+    position: Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+    child: child,
+  ),
+);
+
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
 
@@ -12,20 +24,7 @@ class MiniPlayer extends StatelessWidget {
 class _MiniPlayerBody extends StatelessWidget {
   const _MiniPlayerBody();
 
-  void _openFull(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (_, _, _) => const DarkZone(child: NowPlayingPage()),
-        transitionsBuilder: (_, anim, _, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-          child: child,
-        ),
-      ),
-    );
-  }
+  void _openFull(BuildContext context) => Navigator.of(context).push(nowPlayingRoute());
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +239,7 @@ class NowPlayingPage extends StatelessWidget {
                                       ),
                                     ),
                                     IconButton(
+                                      key: TourKeys.npLike,
                                       iconSize: 30,
                                       tooltip: song.liked ? 'Beğenmekten vazgeç' : 'Beğen',
                                       icon: Icon(
@@ -251,12 +251,13 @@ class NowPlayingPage extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                const SeekBar(),
+                                SeekBar(key: TourKeys.npSeek),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     IconButton(
+                                      key: TourKeys.npShuffle,
                                       icon: Icon(
                                         shuffleIconFor(c),
                                         color: c.shuffleOn ? kGreen : Colors.white,
@@ -264,11 +265,13 @@ class NowPlayingPage extends StatelessWidget {
                                       onPressed: () => showShuffleSheet(context),
                                     ),
                                     IconButton(
+                                      key: TourKeys.npPrev,
                                       iconSize: 40,
                                       icon: const Icon(Icons.skip_previous),
                                       onPressed: c.previous,
                                     ),
                                     Container(
+                                      key: TourKeys.npPlay,
                                       width: 72,
                                       height: 72,
                                       decoration: const BoxDecoration(
@@ -283,11 +286,13 @@ class NowPlayingPage extends StatelessWidget {
                                       ),
                                     ),
                                     IconButton(
+                                      key: TourKeys.npNext,
                                       iconSize: 40,
                                       icon: const Icon(Icons.skip_next),
                                       onPressed: c.hasNext ? c.next : null,
                                     ),
                                     IconButton(
+                                      key: TourKeys.npRepeat,
                                       icon: Icon(
                                         c.repeatKind == RepeatKind.one
                                             ? Icons.repeat_one
@@ -302,15 +307,17 @@ class NowPlayingPage extends StatelessWidget {
                                 ),
                                 Row(
                                   children: [
-                                    const _SleepTimerButton(),
-                                    const _BoosterButton(),
+                                    _SleepTimerButton(key: TourKeys.npSleep),
+                                    _BoosterButton(key: TourKeys.npBooster),
                                     IconButton(
+                                      key: TourKeys.npTune,
                                       tooltip: 'Çalma ayarları',
                                       icon: const Icon(Icons.tune),
                                       onPressed: () => openSettings(context),
                                     ),
                                     const Spacer(),
                                     IconButton(
+                                      key: TourKeys.npQueue,
                                       tooltip: 'Sıra',
                                       icon: const Icon(Icons.queue_music),
                                       onPressed: () => openQueue(context),
@@ -323,7 +330,7 @@ class NowPlayingPage extends StatelessWidget {
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: LyricsCard(song: song),
+                          child: LyricsCard(key: TourKeys.npLyrics, song: song),
                         ),
                         const SizedBox(height: 24),
                       ],
@@ -341,7 +348,7 @@ class NowPlayingPage extends StatelessWidget {
 
 /// Tam ekran pleyerdə yuxu taymeri düyməsi: aktivdirsə yaşıl olur və qalan vaxtı göstərir.
 class _SleepTimerButton extends StatelessWidget {
-  const _SleepTimerButton();
+  const _SleepTimerButton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -656,7 +663,7 @@ class _SeekBarState extends State<SeekBar> {
 
 /// Səs gücləndirici: şarkı ekranında sürətli aç (1x..10x, aydınlıq).
 class _BoosterButton extends StatelessWidget {
-  const _BoosterButton();
+  const _BoosterButton({super.key});
 
   @override
   Widget build(BuildContext context) {

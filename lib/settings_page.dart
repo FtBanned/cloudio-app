@@ -16,8 +16,8 @@ import 'player_controller.dart';
 import 'stats_page.dart';
 
 /// Ayarlar səhifəsini açır (profil şəkli və Now Playing-dəki "tune" düyməsi bunu çağırır).
-void openSettings(BuildContext context) {
-  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage()));
+Future<void> openSettings(BuildContext context) {
+  return Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage()));
 }
 
 String crossfadeLabel(double v) {
@@ -46,6 +46,7 @@ class SettingsPage extends StatelessWidget {
       body: ListenableBuilder(
         listenable: c,
         builder: (context, _) => ListView(
+          controller: TourKeys.settingsScroll, // animasiyalı rehber üçün
           padding: EdgeInsets.only(bottom: 24 + MediaQuery.of(context).padding.bottom),
           children: [
             // ---------- Hesap ----------
@@ -141,6 +142,7 @@ class SettingsPage extends StatelessWidget {
             // ---------- Uyku zamanlayıcısı ----------
             const _SectionTitle('Uyku zamanlayıcısı'),
             ListTile(
+              key: TourKeys.settingsSleep,
               leading: Icon(Icons.bedtime_outlined, color: c.sleepActive ? kGreen : kText70),
               title: const Text('Müziği otomatik durdur'),
               subtitle: Text(
@@ -175,6 +177,7 @@ class SettingsPage extends StatelessWidget {
             ),
             if (!kIsWeb)
               ListTile(
+                key: TourKeys.settingsBackup,
                 leading: Icon(Icons.cloud_upload_outlined, color: kGreen),
                 title: const Text('Yedekle ve geri yükle'),
                 subtitle: Text(

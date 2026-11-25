@@ -148,6 +148,10 @@ class _MainShellState extends State<MainShell> {
     TourBridge.setCreateOpen = _tourSetCreate;
     TourBridge.openSongMenu = _tourOpenSongMenu;
     TourBridge.closeSongMenu = _tourCloseSongMenu;
+    TourBridge.openFull = _tourOpenFull;
+    TourBridge.closeFull = _tourCloseFull;
+    TourBridge.openSettingsPage = _tourOpenSettings;
+    TourBridge.closeSettingsPage = _tourCloseSettings;
     // İlk quraşdırmada qarşılama ekranı (yalnız təzə, boş kitabxanada)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(maybeShowOnboarding(context));
@@ -160,6 +164,10 @@ class _MainShellState extends State<MainShell> {
     TourBridge.setCreateOpen = null;
     TourBridge.openSongMenu = null;
     TourBridge.closeSongMenu = null;
+    TourBridge.openFull = null;
+    TourBridge.closeFull = null;
+    TourBridge.openSettingsPage = null;
+    TourBridge.closeSettingsPage = null;
     super.dispose();
   }
 
@@ -169,6 +177,36 @@ class _MainShellState extends State<MainShell> {
       _createOpen = false;
       _index = i;
     });
+  }
+
+  bool _tourSettingsOpen = false;
+
+  /// Rehber Ayarlar səhifəsini özü açır / bağlayır.
+  void _tourOpenSettings() {
+    if (!mounted || _tourSettingsOpen) return;
+    _tourSettingsOpen = true;
+    openSettings(context).whenComplete(() => _tourSettingsOpen = false);
+  }
+
+  void _tourCloseSettings() {
+    if (!mounted || !_tourSettingsOpen) return;
+    _tourSettingsOpen = false;
+    Navigator.of(context).maybePop();
+  }
+
+  bool _tourFullOpen = false;
+
+  /// Rehber tam ekran oynadıcını özü açır / bağlayır.
+  void _tourOpenFull() {
+    if (!mounted || _tourFullOpen) return;
+    _tourFullOpen = true;
+    Navigator.of(context).push(nowPlayingRoute()).whenComplete(() => _tourFullOpen = false);
+  }
+
+  void _tourCloseFull() {
+    if (!mounted || !_tourFullOpen) return;
+    _tourFullOpen = false;
+    Navigator.of(context).maybePop();
   }
 
   bool _tourMenuOpen = false;
