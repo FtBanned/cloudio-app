@@ -52,7 +52,7 @@ class _QueuePageState extends State<QueuePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Sıra',
+                              'Sıra (yamaq testi)',
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                             ),
                             Text(
