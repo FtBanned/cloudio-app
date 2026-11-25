@@ -29,18 +29,26 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
-                const ProfileAvatar(),
+                KeyedSubtree(key: TourKeys.homeAvatar, child: const ProfileAvatar()),
                 const SizedBox(width: 12),
-                FilterPill(
-                  'Tümü',
-                  selected: !_musicOnly,
-                  onTap: () => setState(() => _musicOnly = false),
-                ),
-                const SizedBox(width: 8),
-                FilterPill(
-                  'Müzik',
-                  selected: _musicOnly,
-                  onTap: () => setState(() => _musicOnly = true),
+                KeyedSubtree(
+                  key: TourKeys.homeFilters,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FilterPill(
+                        'Tümü',
+                        selected: !_musicOnly,
+                        onTap: () => setState(() => _musicOnly = false),
+                      ),
+                      const SizedBox(width: 8),
+                      FilterPill(
+                        'Müzik',
+                        selected: _musicOnly,
+                        onTap: () => setState(() => _musicOnly = true),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

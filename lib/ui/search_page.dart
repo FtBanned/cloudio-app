@@ -45,6 +45,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
               const SizedBox(height: 16),
               TextField(
+                key: TourKeys.searchField,
                 onChanged: (v) => setState(() => _query = v),
                 style: const TextStyle(color: Colors.black),
                 cursorColor: Colors.black,

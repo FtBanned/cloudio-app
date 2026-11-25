@@ -59,6 +59,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       onPressed: c.metaRunning ? c.cancelMeta : c.refreshMeta,
                     ),
                   IconButton(
+                    key: TourKeys.libraryAdd,
                     icon: const Icon(Icons.add, size: 28),
                     tooltip: 'Şarkı ekle',
                     onPressed: c.loading ? null : c.addSongs,
@@ -120,6 +121,7 @@ class _LibraryPageState extends State<LibraryPage> {
             _CollectionRow(
               leading: const _IconSquare(Icons.favorite, [Color(0xFF4A2BD8), Color(0xFF9DB6E8)]),
               title: 'Beğenilen Şarkılar',
+              tourKey: TourKeys.libLiked,
               subtitle: 'Çalma listesi • ${countAndTotal(liked)}',
               onTap: () =>
                   Navigator.of(context)
@@ -128,6 +130,7 @@ class _LibraryPageState extends State<LibraryPage> {
             _CollectionRow(
               leading: _IconSquare(Icons.library_music, [Color(0xFF1B6B3A), kGreen]),
               title: 'Tüm Şarkılar',
+              tourKey: TourKeys.libAll,
               subtitle: 'Kitaplık • ${countAndTotal(c.songs)}',
               onTap: () =>
                   Navigator.of(context)
@@ -187,16 +190,19 @@ class _CollectionRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final GlobalKey? tourKey; // rehberin işıq salması üçün
   const _CollectionRow({
     required this.leading,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.tourKey,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      key: tourKey,
       leading: leading,
       title: Text(
         title,

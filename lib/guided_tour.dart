@@ -14,6 +14,22 @@ class TourKeys {
   static final library = GlobalKey(debugLabel: 'tour-library');
   static final create = GlobalKey(debugLabel: 'tour-create');
   static final miniPlayer = GlobalKey(debugLabel: 'tour-mini-player');
+
+  // Mərhələ 1: səhifələrin içindəki elementlər
+  static final homeAvatar = GlobalKey(debugLabel: 'tour-home-avatar');
+  static final homeFilters = GlobalKey(debugLabel: 'tour-home-filters');
+  static final searchField = GlobalKey(debugLabel: 'tour-search-field');
+  static final libraryAdd = GlobalKey(debugLabel: 'tour-library-add');
+  static final libLiked = GlobalKey(debugLabel: 'tour-lib-liked');
+  static final libAll = GlobalKey(debugLabel: 'tour-lib-all');
+  static final createPanel = GlobalKey(debugLabel: 'tour-create-panel');
+}
+
+/// Rehberin tətbiqi "idarə etməsi" üçün körpü. MainShell özünü bura qeyd edir,
+/// rehber isə tab dəyişir / "Oluştur" pəncərəsini açıb-bağlayır.
+class TourBridge {
+  static void Function(int tab)? selectTab;
+  static void Function(bool open)? setCreateOpen;
 }
 
 /// Animasiyalı rehberi idarə edir. Rehber MaterialApp-ın `builder`-ində qurulmuş
@@ -30,7 +46,10 @@ class GuidedTour {
     }
   }
 
-  static void stop() => active.value = false;
+  static void stop() {
+    active.value = false;
+    TourBridge.setCreateOpen?.call(false);
+  }
 }
 
 class GuidedTourHost extends StatelessWidget {
@@ -58,6 +77,12 @@ class _TourStep {
   /// null deyilsə: kartda bir-bir yanan özəllik ikonları göstərilir
   final List<(IconData, String)>? features;
 
+  /// Addım açılan kimi dərhal işləyir (tab seç, pəncərə aç/bağla). Təkrar çağırıla bilər.
+  final VoidCallback? prepare;
+
+  /// "Toxun" animasiyasından bir az sonra rehberin ÖZÜ yerinə yetirdiyi hərəkət.
+  final VoidCallback? act;
+
   const _TourStep({
     this.target,
     required this.title,
@@ -65,47 +90,110 @@ class _TourStep {
     this.mood = WizardMood.idle,
     this.tap = false,
     this.features,
+    this.prepare,
+    this.act,
   });
 }
 
+void _tab(int i) => TourBridge.selectTab?.call(i);
+void _create(bool open) => TourBridge.setCreateOpen?.call(open);
+
 final List<_TourStep> _steps = [
-  const _TourStep(
+  _TourStep(
     title: 'Merhaba, ben Cloudio Büyücüsü!',
-    body: 'Sana uygulamayı kısaca gezdireyim. Hazırsan başlayalım, çubuğumu sallamam yetiyor!',
+    body: 'Sana uygulamayı gezdireyim. Düğmelere ben basacağım, sen sadece izle. Hazırsan başlayalım!',
     mood: WizardMood.wave,
+    prepare: () {
+      _create(false);
+      _tab(0);
+    },
   ),
-  _TourStep(
-    target: TourKeys.library,
-    tap: true,
-    title: 'Şarkılarını ekle',
-    body:
-        '"Kitaplığın" sekmesini aç, sağ üstteki + düğmesiyle telefonundaki müzik dosyalarını '
-        'seç. Kapak ve sözleri internetten ben bulurum.',
-  ),
-  _TourStep(
-    target: TourKeys.search,
-    tap: true,
-    title: 'Ara ve bul',
-    body: 'Şarkı, sanatçı veya albüm adını yaz, hemen bulayım.',
-  ),
+  // ---------- Mərhələ 1: əsas sekmələr ----------
   _TourStep(
     target: TourKeys.home,
     tap: true,
     title: 'Ana sayfa',
     body: 'Son çaldıkların, en çok dinlediklerin ve geçen yıl bugün ne dinlediğin burada.',
+    prepare: () => _create(false),
+    act: () => _tab(0),
+  ),
+  _TourStep(
+    target: TourKeys.homeAvatar,
+    title: 'Profil ve ayarlar',
+    body: 'Profil resmine dokunursan Ayarlar açılır: tema, yedekleme ve çalma ayarları orada.',
+    prepare: () => _tab(0),
+  ),
+  _TourStep(
+    target: TourKeys.homeFilters,
+    title: 'Tümü / Müzik',
+    body: '"Tümü" özet rafları gösterir. "Müzik"e basarsan bütün şarkıların alt alta listelenir.',
+    prepare: () => _tab(0),
+  ),
+  _TourStep(
+    target: TourKeys.search,
+    tap: true,
+    title: 'Arama sekmesi',
+    body: 'Şarkı, sanatçı veya albüm adını yaz, hemen bulayım.',
+    prepare: () => _create(false),
+    act: () => _tab(1),
+  ),
+  _TourStep(
+    target: TourKeys.searchField,
+    title: 'Arama kutusu',
+    body: 'Buraya yazdıkça sonuçlar canlı çıkar. Boşken türlere göre göz atabilirsin.',
+    prepare: () => _tab(1),
+  ),
+  _TourStep(
+    target: TourKeys.library,
+    tap: true,
+    title: 'Kitaplığın sekmesi',
+    body: 'Bütün müziğin, beğendiklerin ve çalma listelerin burada durur.',
+    prepare: () => _create(false),
+    act: () => _tab(2),
+  ),
+  _TourStep(
+    target: TourKeys.libraryAdd,
+    tap: true,
+    title: 'Şarkı ekle',
+    body:
+        'Sağ üstteki + ile telefonundaki müzik dosyalarını seçersin. '
+        'Kapak ve sözleri internetten ben bulurum.',
+    prepare: () => _tab(2),
+  ),
+  _TourStep(
+    target: TourKeys.libLiked,
+    title: 'Beğenilen Şarkılar',
+    body: 'Şarkı ekranında ✓ düğmesine bastığın bütün şarkılar bu listede toplanır.',
+    prepare: () => _tab(2),
+  ),
+  _TourStep(
+    target: TourKeys.libAll,
+    title: 'Tüm Şarkılar',
+    body: 'Eklediğin bütün şarkılar burada. Birine dokunursan hemen çalmaya başlar.',
+    prepare: () => _tab(2),
   ),
   _TourStep(
     target: TourKeys.create,
     tap: true,
     title: 'Çalma listesi oluştur',
-    body: 'Buna basıp yeni bir çalma listesi yap. Şarkıları şarkı menüsünden içine ekleyebilirsin.',
+    body: 'Buna basınca küçük bir pencere açılır. Hadi birlikte bakalım!',
+    prepare: () => _create(false),
+    act: () => _create(true),
   ),
+  _TourStep(
+    target: TourKeys.createPanel,
+    title: 'Yeni çalma listesi',
+    body: 'Buna basıp listeye bir ad verirsin. Şarkıları şarkı menüsünden (⋯) içine eklersin.',
+    prepare: () => _create(true),
+  ),
+  // ---------- Mərhələ 2+ üçün müvəqqəti: köhnə addımlar ----------
   _TourStep(
     target: TourKeys.miniPlayer,
     title: 'Mini oynatıcı',
     body:
         'Bir şarkı çalarken altta mini oynatıcı belirir. Ona dokunursan tam ekran açılır: '
         'sözler, sıra, hız ve daha fazlası.',
+    prepare: () => _create(false),
   ),
   const _TourStep(
     title: 'Sihirli özellikler',
@@ -124,10 +212,14 @@ final List<_TourStep> _steps = [
         'Uygulamayı silersen kitaplığın da gider. Ayarlar → "Yedekle ve geri yükle" ile '
         'düzenli yedek al.',
   ),
-  const _TourStep(
+  _TourStep(
     title: 'Hazırsın!',
     body: 'Beni tekrar görmek istersen Ayarlar → Hakkında → "Büyücü rehberi"ne bas. İyi dinlemeler!',
     mood: WizardMood.cheer,
+    prepare: () {
+      _create(false);
+      _tab(0);
+    },
   ),
 ];
 
@@ -148,6 +240,7 @@ class _TourOverlayState extends State<_TourOverlay> with SingleTickerProviderSta
   int _i = 0;
   int _chars = 0;
   Timer? _typer;
+  Timer? _actTimer;
 
   _TourStep get _step => _steps[_i];
   bool get _typing => _chars < _step.body.length;
@@ -155,14 +248,31 @@ class _TourOverlayState extends State<_TourOverlay> with SingleTickerProviderSta
   @override
   void initState() {
     super.initState();
-    _startTyping();
+    // prepare ilk kadrdan sonra çağırılır (build zamanı setState olmasın)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _enter();
+    });
   }
 
   @override
   void dispose() {
     _typer?.cancel();
+    _actTimer?.cancel();
     _loop.dispose();
     super.dispose();
+  }
+
+  /// Yeni addıma girəndə: vəziyyəti hazırla, yazmağa başla, lazımdırsa 1 san sonra özü toxun.
+  void _enter() {
+    _actTimer?.cancel();
+    final s = _step;
+    s.prepare?.call();
+    _startTyping();
+    if (s.act != null) {
+      _actTimer = Timer(const Duration(milliseconds: 1000), () {
+        if (mounted && identical(_step, s)) s.act!();
+      });
+    }
   }
 
   void _startTyping() {
@@ -196,7 +306,7 @@ class _TourOverlayState extends State<_TourOverlay> with SingleTickerProviderSta
       return;
     }
     setState(() => _i = n);
-    _startTyping();
+    _enter();
   }
 
   /// Hədəf elementin ekrandakı düzbucağı (görünmürsə / ölçüsü yoxdursa null).

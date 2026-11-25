@@ -143,10 +143,41 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    // Animasiyalı rehber tabları və "Oluştur" pəncərəsini buradan idarə edir
+    TourBridge.selectTab = _tourSelectTab;
+    TourBridge.setCreateOpen = _tourSetCreate;
     // İlk quraşdırmada qarşılama ekranı (yalnız təzə, boş kitabxanada)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(maybeShowOnboarding(context));
     });
+  }
+
+  @override
+  void dispose() {
+    TourBridge.selectTab = null;
+    TourBridge.setCreateOpen = null;
+    super.dispose();
+  }
+
+  void _tourSelectTab(int i) {
+    if (!mounted) return;
+    setState(() {
+      _createOpen = false;
+      _index = i;
+    });
+  }
+
+  void _tourSetCreate(bool open) {
+    if (!mounted || _createOpen == open) return;
+    if (open) {
+      final h = _barKey.currentContext?.size?.height ?? 80;
+      setState(() {
+        _barH = h;
+        _createOpen = true;
+      });
+    } else {
+      setState(() => _createOpen = false);
+    }
   }
 
   void _onTap(int i) {
@@ -392,6 +423,7 @@ class _CreateOverlay extends StatelessWidget {
             right: 16,
             bottom: bottomOffset + 8,
             child: ClipRRect(
+              key: TourKeys.createPanel,
               borderRadius: BorderRadius.circular(24),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
