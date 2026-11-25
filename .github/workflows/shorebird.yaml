@@ -1,0 +1,59 @@
+name: Cloudio iOS - Shorebird
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [patch, release]
+        default: patch
+
+env:
+  SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+
+jobs:
+  shorebird:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shorebirdtech/setup-shorebird@v1
+
+      # Sadece ikon / plist adimlari icin (Codemagic'tekiyle ayni)
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.50.1"
+      - run: flutter pub get && dart run flutter_launcher_icons
+      - name: Info.plist arka plan ses izni
+        run: |
+          PL=ios/Runner/Info.plist
+          if ! /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" >/dev/null 2>&1; then
+            /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PL"
+            /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PL"
+          fi
+
+      - if: ${{ inputs.action == 'release' }}
+        uses: shorebirdtech/shorebird-release@v1
+        with:
+          platform: ios
+          args: --no-codesign --flutter-version=3.50.1
+
+      - if: ${{ inputs.action == 'release' }}
+        name: IPA yarat
+        run: |
+          APP=$(find build/ios/archive -maxdepth 5 -name "Runner.app" -type d | head -n 1)
+          mkdir -p build/ios/out/Payload
+          cp -R "$APP" build/ios/out/Payload/Runner.app
+          cd build/ios/out && zip -qry Cloudio.ipa Payload
+
+      - if: ${{ inputs.action == 'release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cloudio-ipa
+          path: build/ios/out/Cloudio.ipa
+
+      - if: ${{ inputs.action == 'patch' }}
+        uses: shorebirdtech/shorebird-patch@v1
+        with:
+          platform: ios
+          args: --no-codesign
