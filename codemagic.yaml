@@ -1,6 +1,107 @@
+# Cloudio iOS build (Codemagic)
+#
+# 1) ios-shorebird-release : Shorebird "base" buraxilisi + imzasiz IPA (telefona bir defe qurulur)
+# 2) ios-shorebird-patch   : yalniz Dart kodu deyisende, yeni IPA olmadan yamaq gonderir
+# 3) ios-imzasiz           : kohne yol (Shorebird olmadan). Ehtiyat ucun saxlanilib.
+#
+# DIQQET: release ve patch workflow-larinda "ortaq addimlar" EYNI olmalidir
+# (paketler, ikon, Info.plist). Birini deyisseniz digerini de deyisin,
+# yoxsa Shorebird yamagi native deyisiklik kimi gorub imtina ede biler.
+
+definitions:
+  environment:
+    shared_env: &shared_env
+      # Versiyalar sabitlenib: release ve patch eyni toolchain ile qurulmalidir
+      flutter: 3.50.1
+      xcode: 26.6
+      cocoapods: 1.16.2
+      groups:
+        # SHOREBIRD_TOKEN bu qrupdadir (Codemagic > Teams > Global Variables and Secrets)
+        - shorebird
+      vars:
+        FLUTTER_VERSION: 3.50.1
+  scripts:
+    - &shorebird_install
+      name: Shorebird yukle
+      script: |
+        curl -fsSL https://shorebird.dev/install.sh | bash
+        echo PATH="$HOME/.shorebird/bin:$PATH" >> $CM_ENV
+    - &versiyalar
+      name: Versiyalari goster (diaqnostika)
+      script: |
+        flutter --version
+        xcodebuild -version
+        pod --version
+        git log -1 --oneline
+        ls -la shorebird.yaml
+    - &paketler
+      name: Paketleri yukle
+      script: flutter pub get
+    - &ikon
+      name: Uygulama ikonu
+      script: dart run flutter_launcher_icons
+    - &plist
+      name: Info.plist arka plan ses izni
+      script: |
+        PL=ios/Runner/Info.plist
+        if ! /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" >/dev/null 2>&1; then
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PL"
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PL"
+        fi
+        /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL"
+
 workflows:
+  ios-shorebird-release:
+    name: Cloudio iOS - Shorebird RELEASE (imzasiz IPA)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      <<: *shared_env
+    scripts:
+      - *shorebird_install
+      - *versiyalar
+      - *paketler
+      - *ikon
+      - *plist
+      - name: Shorebird release (imzasiz)
+        script: |
+          shorebird release ios --no-codesign --flutter-version="$FLUTTER_VERSION"
+      - name: IPA yarat (xcarchive icinden)
+        script: |
+          set -e
+          APP=$(find build/ios/archive -maxdepth 5 -name "Runner.app" -type d | head -n 1)
+          echo "Tapilan .app: $APP"
+          if [ -z "$APP" ]; then
+            echo "XETA: Runner.app tapilmadi. build/ios icindekiler:"
+            find build/ios -maxdepth 5
+            exit 1
+          fi
+          mkdir -p build/ios/out/Payload
+          cp -R "$APP" build/ios/out/Payload/Runner.app
+          cd build/ios/out
+          zip -qry Cloudio.ipa Payload
+          ls -la Cloudio.ipa
+    artifacts:
+      - build/ios/out/Cloudio.ipa
+
+  ios-shorebird-patch:
+    name: Cloudio iOS - Shorebird PATCH (yalniz Dart)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      <<: *shared_env
+    scripts:
+      - *shorebird_install
+      - *versiyalar
+      - *paketler
+      - *ikon
+      - *plist
+      - name: Shorebird patch (imzasiz)
+        script: |
+          shorebird patch ios --no-codesign
+
   ios-imzasiz:
-    name: Cloudio iOS (imzasiz)
+    name: Cloudio iOS (imzasiz, kohne yol)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
