@@ -56,4 +56,5 @@ jobs:
         uses: shorebirdtech/shorebird-patch@v1
         with:
           platform: ios
-          args: --no-codesign
+          # DƏYİŞDİ: release versiyası əl ilə verilir, track da açıq yazılır
+          args: --no-codesign --release-version=1.0.0+1 --track=stable
